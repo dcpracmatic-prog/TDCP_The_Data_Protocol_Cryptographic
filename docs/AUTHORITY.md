@@ -84,3 +84,53 @@ Gatekeeper accepts optional `authority`; existing `oracle` option remains for ba
 - Independent security review
 - Multi-tenant isolation, backups, monitoring, SLOs
 - Formal threat model update in `AUDIT_2.5.1.md`
+
+## Admin authentication
+
+Admin endpoints require `Authorization: Bearer <TDCP_AUTHORITY_ADMIN_TOKEN>`:
+
+- `POST /v1/documents/register`
+- `GET /v1/documents`
+- `POST /v1/revoke`
+- `POST /v1/restore`
+- `GET /v1/revoked`
+
+If the env token is unset, admin routes return **503** `ADMIN_TOKEN_NOT_CONFIGURED`. Wrong/missing Bearer → **401** `UNAUTHORIZED`.
+
+```bash
+export TDCP_AUTHORITY_ADMIN_TOKEN="$(openssl rand -hex 32)"
+curl -s -X POST "$TDCP_AUTHORITY_URL/v1/documents/register" \
+  -H "authorization: Bearer $TDCP_AUTHORITY_ADMIN_TOKEN" \
+  -H "content-type: application/json" \
+  -d '{"documentId":"DOC-1","packageId":"PKG-1","policyLevel":"STANDARD","allowExtraction":false,"createdAt":0}'
+```
+
+Issuer / Node tooling may set `TDCP_AUTHORITY_ADMIN_TOKEN` for `HttpAuthorityClient`. `VITE_TDCP_AUTHORITY_ADMIN_TOKEN` is **local demo only** (leaks into the browser bundle).
+
+Gatekeeper public path (challenge / authorize / wrap-secret release / public-key / per-document policy get) stays unauthenticated, with in-memory rate limits on challenge/authorize.
+
+## Ops endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/health` | Liveness |
+| GET | `/ready` | Ready = store writable + signing key loaded |
+| GET | `/metrics` | Prometheus counters |
+
+See `docs/OPS.md`.
+
+## Signing backend
+
+| `TDCP_SIGNING_BACKEND` | Behavior |
+|------------------------|----------|
+| `file` (default) | Extractable JWK on disk via `DurableFileOracleKeyStore`. **NOT production-grade.** |
+| `kms-stub` | `KmsOracleKeyStore` stub — local key + `signCanonical` hook documenting AWS KMS Sign. **No AWS credentials. NOT production-grade.** |
+
+Production: implement real KMS Sign behind `OracleKeyStore.signCanonical` (see `src/oracle/oracle-key-store.ts`). Clear README note: file JWK is not production-grade.
+
+## Commercial hardening docs
+
+- Ops / backups / SLO sketch: `docs/OPS.md`
+- Security review pack (not a certification): `docs/SECURITY_REVIEW_PACK.md`
+- SKUs / legal placeholders: `docs/COMMERCIAL.md`
+- Landing copy EN/ES: `docs/LANDING_COPY.md`

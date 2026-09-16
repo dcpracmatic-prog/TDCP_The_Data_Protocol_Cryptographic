@@ -14,7 +14,11 @@ import { arrayBufferToBase64, base64ToArrayBuffer } from '../../src/core/crypto/
 import { InProcessAuthority } from '../../src/authority/in-process-authority.ts';
 import type { AuthorityPublicInfo } from '../../src/authority/types.ts';
 import { DurableJsonAuthorityStore, type DurableAuthoritySnapshot } from './durable-store.ts';
-import { DurableFileOracleKeyStore } from './durable-key-store.ts';
+import {
+  createAuthoritySigningKeyStore,
+  readSigningBackendFromEnv,
+  type SigningBackendKind,
+} from './signing-backend.ts';
 
 function bytesToBase64(bytes: Uint8Array): string {
   return arrayBufferToBase64(bytes);
@@ -24,26 +28,44 @@ function base64ToBytes(b64: string): Uint8Array {
   return new Uint8Array(base64ToArrayBuffer(b64));
 }
 
+export interface DurableAuthorityServiceOptions {
+  dataDir: string;
+  signingBackend?: SigningBackendKind;
+}
+
 export class DurableAuthorityService {
   private readonly store: DurableJsonAuthorityStore;
   private snapshot: DurableAuthoritySnapshot;
   private oracle!: AuthorizationOracle;
   private authority!: InProcessAuthority;
+  private readonly signingBackend: SigningBackendKind;
+  private signingKeyLoaded = false;
+  private initialized = false;
 
-  constructor(dataDir: string) {
-    this.store = new DurableJsonAuthorityStore(dataDir);
+  constructor(dataDirOrOptions: string | DurableAuthorityServiceOptions) {
+    const options: DurableAuthorityServiceOptions =
+      typeof dataDirOrOptions === 'string'
+        ? { dataDir: dataDirOrOptions }
+        : dataDirOrOptions;
+    this.store = new DurableJsonAuthorityStore(options.dataDir);
     this.snapshot = this.store.load();
+    this.signingBackend = options.signingBackend ?? readSigningBackendFromEnv();
   }
 
   public async initialize(): Promise<void> {
-    const keyStore = new DurableFileOracleKeyStore(this.snapshot, (priv, pub) => {
-      this.snapshot.signingPrivateJwk = priv;
-      this.snapshot.signingPublicJwk = pub;
-      this.persist();
+    const keyStore = createAuthoritySigningKeyStore({
+      backend: this.signingBackend,
+      snapshot: this.snapshot,
+      onPersist: (priv, pub) => {
+        this.snapshot.signingPrivateJwk = priv;
+        this.snapshot.signingPublicJwk = pub;
+        this.persist();
+      },
     });
 
     this.oracle = new AuthorizationOracle(keyStore);
     await this.oracle.initialize();
+    this.signingKeyLoaded = true;
     this.authority = new InProcessAuthority(this.oracle);
 
     // Hydrate policies + wrap secrets
@@ -86,6 +108,8 @@ export class DurableAuthorityService {
     for (const id of this.snapshot.consumedGrantIds) {
       consumed.add(id);
     }
+
+    this.initialized = true;
   }
 
   private captureSnapshot(): void {
@@ -122,6 +146,34 @@ export class DurableAuthorityService {
   private persist(): void {
     this.captureSnapshot();
     this.store.save(this.snapshot);
+  }
+
+
+  /** Readiness: durable store writable + signing key loaded. */
+  public getReadiness(): {
+    ready: boolean;
+    storeWritable: boolean;
+    signingKeyLoaded: boolean;
+    signingBackend: SigningBackendKind;
+    developmentOnly: boolean;
+  } {
+    let storeWritable = false;
+    try {
+      storeWritable = this.store.probeWritable();
+    } catch {
+      storeWritable = false;
+    }
+    return {
+      ready: storeWritable && this.signingKeyLoaded,
+      storeWritable,
+      signingKeyLoaded: this.signingKeyLoaded,
+      signingBackend: this.signingBackend,
+      developmentOnly: this.initialized ? this.oracle.isDevelopmentKeyStore() : true,
+    };
+  }
+
+  public getDataDir(): string {
+    return this.store.dataDir;
   }
 
   public getAuthority(): InProcessAuthority {
