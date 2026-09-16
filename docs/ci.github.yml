@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, "feat/**"]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Test (protocol + auth/app-data)
+        run: npm test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_AUTH_ENABLED: "false"
+
+      # App Builder harness tests under scripts/** expect optional .grok skill trees;
+      # they are not required for the TDCP protocol gate. Run informatively.
+      - name: Script harness tests (informational)
+        continue-on-error: true
+        run: npm run test:scripts

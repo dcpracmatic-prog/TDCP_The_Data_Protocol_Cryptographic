@@ -1,0 +1,11 @@
+services:
+  tdcp-web:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - VITE_AUTH_ENABLED=false
+    # Optional: mount source for live edit during demos
+    # volumes:
+    #   - .:/app
+    #   - /app/node_modules
