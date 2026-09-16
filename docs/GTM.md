@@ -47,3 +47,5 @@ Clearly marked as sketch — do not publish as committed pricing without legal/f
 **Pitch line:** “Don’t buy another IRM UI — integrate a protocol where copying the file never copies the right to use it.”
 
 **Do not claim:** production HSM parity for browser Oracle; formal proofs; feature parity with Seclore/Virtru.
+
+See also expanded SKUs / legal placeholders: [`docs/COMMERCIAL.md`](./COMMERCIAL.md), landing copy: [`docs/LANDING_COPY.md`](./LANDING_COPY.md).

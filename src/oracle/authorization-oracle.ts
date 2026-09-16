@@ -26,6 +26,7 @@ import {
   verifySignatureECDSA,
   generateRandomId,
   generateRandomBytes,
+  arrayBufferToBase64,
 } from '../core/crypto/primitives.ts';
 import { DeterministicPolicyEngine } from '../core/policy/policy-engine.ts';
 import { EpochRevocationManager } from '../core/revocation/epoch-manager.ts';
@@ -231,9 +232,7 @@ export class AuthorizationOracle {
 
     const now = Date.now();
     const expiresAt = now + decision.validityWindowSeconds * 1000;
-    const keyPair = await this.keyStore.getOrCreateSigningKey();
-
-    const unsignedGrantPayload: Omit<AuthorizationGrant, 'signature'> = {
+        const unsignedGrantPayload: Omit<AuthorizationGrant, 'signature'> = {
       grantId: generateRandomId('GRANT'),
       documentId: request.documentId,
       packageId: request.packageId,
@@ -253,7 +252,14 @@ export class AuthorizationOracle {
     };
 
     const canonicalString = canonicalizeGrant(unsignedGrantPayload);
-    const signature = await signDataECDSA(keyPair.privateKey, canonicalString);
+    let signature: string;
+    if (typeof this.keyStore.signCanonical === 'function') {
+      const sigBuf = await this.keyStore.signCanonical(canonicalString);
+      signature = arrayBufferToBase64(sigBuf);
+    } else {
+      const keyPair = await this.keyStore.getOrCreateSigningKey();
+      signature = await signDataECDSA(keyPair.privateKey, canonicalString);
+    }
 
     const fullGrant: AuthorizationGrant = {
       ...unsignedGrantPayload,

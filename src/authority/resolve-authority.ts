@@ -25,16 +25,34 @@ export function readAuthorityUrlFromEnv(
   return String(url).trim().replace(/\/$/, '');
 }
 
+function readAdminTokenFromEnv(
+  env: Record<string, string | undefined> = typeof process !== 'undefined'
+    ? (process.env as Record<string, string | undefined>)
+    : {}
+): string | undefined {
+  // Prefer server/issuer env. VITE_ variant is LOCAL DEMO ONLY (leaks to browser bundle).
+  const t =
+    env.TDCP_AUTHORITY_ADMIN_TOKEN ||
+    (typeof import.meta !== 'undefined'
+      ? (import.meta as ImportMeta & { env?: Record<string, string> }).env
+          ?.VITE_TDCP_AUTHORITY_ADMIN_TOKEN
+      : undefined);
+  if (!t || !String(t).trim()) return undefined;
+  return String(t).trim();
+}
+
 export function resolveAuthorizationAuthority(options?: {
   authorityUrl?: string;
   oracle?: AuthorizationOracle;
   fetchImpl?: typeof fetch;
+  adminToken?: string;
 }): AuthorizationAuthority {
   const url = options?.authorityUrl ?? readAuthorityUrlFromEnv();
   if (url) {
     return new HttpAuthorityClient({
       baseUrl: url,
       fetchImpl: options?.fetchImpl,
+      adminToken: options?.adminToken ?? readAdminTokenFromEnv(),
     });
   }
   return new InProcessAuthority(options?.oracle ?? globalAuthorizationOracle);

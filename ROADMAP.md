@@ -64,10 +64,23 @@ Do **not** change crypto primitives or Gatekeeper security semantics under these
 - [x] `LAUNCH.md`, `docs/GTM.md`
 - [x] CI template includes Authority tests (`docs/ci.github.yml`)
 
+## P5 — Commercial hardening (this PR) — **DONE (honest MVP)**
+
+**Goal:** Production-leaning Authority ops without fake HSM claims.
+
+- [x] Admin Bearer auth for register/revoke (`TDCP_AUTHORITY_ADMIN_TOKEN`)
+- [x] `/health`, `/ready`, `/metrics` + structured request logs (no secrets)
+- [x] Ops runbook (`docs/OPS.md`), security review pack, commercial + landing docs
+- [x] `TDCP_SIGNING_BACKEND=file|kms-stub` interface path (`signCanonical` hook)
+- [x] Tests: 401 without token, success with token, KMS stub signing
+
+**Exit criteria:** Admin auth + ops endpoints tested; docs honest about non-production file/kms-stub signing.  
+**Remaining true blockers for paid launch:** real KMS/HSM, independent review, ToS/DPA, multi-tenant isolation, encrypted backups.
+
 ## Explicitly deferred
 
 - Full IRM SaaS parity (Seclore / Virtru / Digify feature race)
 - Office plugin suite, email gateway, CASB marketplace listing
 - Firebase / Gemini in the control plane
 - Formal cryptographic proofs
-- Real HSM/KMS-backed Authority signing (stubs only today)
+- Real HSM/KMS-backed Authority signing (file + kms-stub only today; interface ready)

@@ -84,4 +84,11 @@ export class DurableJsonAuthorityStore {
   public save(snapshot: DurableAuthoritySnapshot): void {
     atomicWriteJson(this.snapshotPath, snapshot);
   }
+
+  /** Write a tiny probe file to verify the data dir is writable. */
+  public probeWritable(): boolean {
+    const probe = join(this.dataDir, '.write-probe');
+    writeFileSync(probe, String(Date.now()), { mode: 0o600 });
+    return existsSync(probe);
+  }
 }

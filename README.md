@@ -9,6 +9,10 @@ TDCP (The Data Cryptographic Protocol) is the protocol layer used by this applic
 - Authority design: [`docs/AUTHORITY.md`](./docs/AUTHORITY.md)
 - Integrator API: [`docs/INTEGRATOR_API.md`](./docs/INTEGRATOR_API.md)
 - Launch checklist: [`LAUNCH.md`](./LAUNCH.md) · GTM sketch: [`docs/GTM.md`](./docs/GTM.md)
+- Ops: [`docs/OPS.md`](./docs/OPS.md) · Security review pack: [`docs/SECURITY_REVIEW_PACK.md`](./docs/SECURITY_REVIEW_PACK.md)
+- Commercial sketch: [`docs/COMMERCIAL.md`](./docs/COMMERCIAL.md) · Landing copy: [`docs/LANDING_COPY.md`](./docs/LANDING_COPY.md)
+
+**Signing honesty:** `TDCP_SIGNING_BACKEND=file` (default) persists an extractable JWK — **not production-grade**. `kms-stub` documents a KMS Sign hook without AWS credentials — also **not** real KMS.
 - Local Authority + web: `./scripts/start-prod-stack.sh` or `docker compose up --build`
 
 

@@ -194,6 +194,7 @@ describe('HttpAuthorityClient against local server', () => {
       dataDir,
       host: '127.0.0.1',
       port: 0,
+      adminToken: 'test-admin-token-http',
     });
     server = started.server;
     const addr = server.address();
@@ -209,7 +210,7 @@ describe('HttpAuthorityClient against local server', () => {
   });
 
   it('registers, grants, and rejects replay over HTTP', async () => {
-    const client = new HttpAuthorityClient({ baseUrl });
+    const client = new HttpAuthorityClient({ baseUrl, adminToken: 'test-admin-token-http' });
     await client.initialize();
     assert.ok(client.getKeyId());
 
@@ -246,5 +247,138 @@ describe('HttpAuthorityClient against local server', () => {
     );
     assert.equal(replay.granted, false);
     assert.equal(replay.rejectionCode, 'REPLAY_ATTACK_DETECTED');
+  });
+});
+
+
+describe('Authority admin auth + ops endpoints', () => {
+  let server: Server;
+  let baseUrl: string;
+  let dataDir: string;
+  const adminToken = 'test-admin-token-ops';
+
+  before(async () => {
+    dataDir = mkdtempSync(join(tmpdir(), 'tdcp-admin-'));
+    const started = await startAuthorityHttpServer({
+      dataDir,
+      host: '127.0.0.1',
+      port: 0,
+      adminToken,
+      rateLimit: { windowMs: 60_000, maxHits: 1000 },
+    });
+    server = started.server;
+    const addr = server.address();
+    if (!addr || typeof addr === 'string') throw new Error('no port');
+    baseUrl = `http://127.0.0.1:${addr.port}`;
+  });
+
+  after(async () => {
+    await new Promise<void>((resolve, reject) => {
+      server.close((err) => (err ? reject(err) : resolve()));
+    });
+    rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  it('returns 401 on register without token', async () => {
+    const res = await fetch(`${baseUrl}/v1/documents/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        documentId: 'DOC-NOAUTH',
+        packageId: 'PKG-NOAUTH',
+        policyLevel: 'STANDARD',
+        allowExtraction: false,
+        createdAt: Date.now(),
+      }),
+    });
+    assert.equal(res.status, 401);
+    const body = (await res.json()) as { error?: string };
+    assert.equal(body.error, 'UNAUTHORIZED');
+  });
+
+  it('registers successfully with Bearer admin token', async () => {
+    const res = await fetch(`${baseUrl}/v1/documents/register`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({
+        documentId: 'DOC-AUTH-OK',
+        packageId: 'PKG-AUTH-OK',
+        policyLevel: 'STANDARD',
+        allowExtraction: false,
+        createdAt: Date.now(),
+      }),
+    });
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as { wrapSecretBase64?: string };
+    assert.ok(body.wrapSecretBase64);
+  });
+
+  it('returns 401 on revoke without token and succeeds with token', async () => {
+    const deny = await fetch(`${baseUrl}/v1/revoke`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ documentId: 'DOC-AUTH-OK', reason: 'test' }),
+    });
+    assert.equal(deny.status, 401);
+
+    const ok = await fetch(`${baseUrl}/v1/revoke`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${adminToken}`,
+      },
+      body: JSON.stringify({ documentId: 'DOC-AUTH-OK', reason: 'test', revokedBy: 'TEST' }),
+    });
+    assert.equal(ok.status, 200);
+    const state = (await ok.json()) as { isRevoked?: boolean };
+    assert.equal(state.isRevoked, true);
+  });
+
+  it('exposes /health, /ready, and /metrics', async () => {
+    const health = await fetch(`${baseUrl}/health`);
+    assert.equal(health.status, 200);
+    const healthBody = (await health.json()) as { ok?: boolean };
+    assert.equal(healthBody.ok, true);
+
+    const ready = await fetch(`${baseUrl}/ready`);
+    assert.equal(ready.status, 200);
+    const readyBody = (await ready.json()) as {
+      ready?: boolean;
+      storeWritable?: boolean;
+      signingKeyLoaded?: boolean;
+    };
+    assert.equal(readyBody.ready, true);
+    assert.equal(readyBody.storeWritable, true);
+    assert.equal(readyBody.signingKeyLoaded, true);
+
+    const metrics = await fetch(`${baseUrl}/metrics`);
+    assert.equal(metrics.status, 200);
+    const text = await metrics.text();
+    assert.match(text, /tdcp_authority_grants_issued/);
+    assert.match(text, /tdcp_authority_revokes/);
+  });
+
+  it('keeps public challenge endpoint available without admin token', async () => {
+    const res = await fetch(`${baseUrl}/v1/challenge`, { method: 'POST' });
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as { challenge?: string };
+    assert.ok(body.challenge);
+  });
+});
+
+describe('KmsOracleKeyStore stub backend', () => {
+  it('signs via signCanonical hook without AWS credentials', async () => {
+    const { KmsOracleKeyStore } = await import('../oracle/oracle-key-store.ts');
+    const store = new KmsOracleKeyStore({ mode: 'stub', keyId: 'TEST-KMS-STUB' });
+    assert.equal(store.kind, 'KMS');
+    assert.equal(store.isProductionGrade, false);
+    assert.equal(store.developmentOnly, true);
+    const sig = await store.signCanonical!('canonical-test');
+    assert.ok(sig.byteLength > 0);
+    const pub = await store.getPublicKey();
+    assert.ok(pub);
   });
 });

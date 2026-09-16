@@ -11,6 +11,9 @@ services:
     environment:
       - TDCP_AUTHORITY_PORT=8787
       - TDCP_AUTHORITY_DATA_DIR=/data/authority
+      # Local compose default only — change before any shared deploy
+      - TDCP_AUTHORITY_ADMIN_TOKEN=${TDCP_AUTHORITY_ADMIN_TOKEN:-local-dev-only-change-me}
+      - TDCP_SIGNING_BACKEND=${TDCP_SIGNING_BACKEND:-file}
     volumes:
       - authority-data:/data/authority
     healthcheck:
@@ -34,6 +37,9 @@ services:
       - VITE_AUTH_ENABLED=false
       - VITE_TDCP_AUTHORITY_URL=http://authority:8787
       - TDCP_AUTHORITY_URL=http://authority:8787
+      # LOCAL DEMO ONLY — mirrors admin token into Vite for encrypt-via-UI against remote Authority
+      - VITE_TDCP_AUTHORITY_ADMIN_TOKEN=${TDCP_AUTHORITY_ADMIN_TOKEN:-local-dev-only-change-me}
+      - TDCP_AUTHORITY_ADMIN_TOKEN=${TDCP_AUTHORITY_ADMIN_TOKEN:-local-dev-only-change-me}
       - PORT=8080
     depends_on:
       authority:
