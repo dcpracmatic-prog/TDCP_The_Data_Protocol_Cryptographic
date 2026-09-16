@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+# Build / output
+dist/
+build/
+.output/
+.nitro/
+.vinxi/
+.tanstack/
+artifacts/
+# Env / secrets
+.env
+.env.*
+!.env.example
+.grok/**
+!.grok/app-env.json
+# Logs / caches
+*.log
+npm-debug.log*
+.npm
+.cache/
+.eslintcache
+coverage/
+.nyc_output/
+tmp/
+temp/
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+*.local
+# Test / playwright
+test-results/
+playwright-report/
+blob-report/
+# Python SDK demo
+sdk/python/__pycache__/
+sdk/python/.venv/
+sdk/python/*.pyc
+*.egg-info/
+# Misc sandbox noise
+public/__grok/
+screenshots/
+attachments/
+.vercel/
