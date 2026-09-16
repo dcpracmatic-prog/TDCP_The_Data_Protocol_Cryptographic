@@ -9,6 +9,9 @@ cd "$ROOT"
 AUTHORITY_PORT="${TDCP_AUTHORITY_PORT:-8787}"
 WEB_PORT="${PORT:-8080}"
 DATA_DIR="${TDCP_AUTHORITY_DATA_DIR:-$ROOT/data/authority}"
+# Local default only — override in real deploys
+export TDCP_AUTHORITY_ADMIN_TOKEN="${TDCP_AUTHORITY_ADMIN_TOKEN:-local-dev-only-change-me}"
+export TDCP_SIGNING_BACKEND="${TDCP_SIGNING_BACKEND:-file}"
 mkdir -p "$DATA_DIR"
 
 if [[ ! -d node_modules ]]; then
@@ -43,6 +46,7 @@ done
 
 export TDCP_AUTHORITY_URL="http://127.0.0.1:${AUTHORITY_PORT}"
 export VITE_TDCP_AUTHORITY_URL="$TDCP_AUTHORITY_URL"
+export VITE_TDCP_AUTHORITY_ADMIN_TOKEN="$TDCP_AUTHORITY_ADMIN_TOKEN"
 export PORT="$WEB_PORT"
 
 echo "[prod-stack] Authority: $TDCP_AUTHORITY_URL"

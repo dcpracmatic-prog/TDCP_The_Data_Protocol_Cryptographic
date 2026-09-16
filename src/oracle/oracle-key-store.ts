@@ -2,11 +2,12 @@
  * The Data Cryptographic Protocol (TDCP)
  * Oracle signing-key storage abstraction
  *
- * DEVELOPMENT ONLY in this build: keys live in process/browser memory.
- * Private keys are NEVER written to localStorage, IndexedDB, or the package.
+ * DEVELOPMENT ONLY in this build: keys live in process/browser memory or
+ * durable file JWK (Authority MVP). Private keys must NEVER ship to browsers
+ * as production Authority material.
  *
- * Production implementations (stubs below) must back the signing key with
- * HSM / KMS / platform Secure Key Store. They do not exist in this demo.
+ * Production: plug AWS KMS / CloudHSM / platform Secure Key Store via
+ * OracleKeyStore (prefer signCanonical when private key is non-exportable).
  */
 
 export type OracleKeyStoreKind =
@@ -22,6 +23,12 @@ export interface OracleKeyStore {
   getKeyId(): string;
   getOrCreateSigningKey(): Promise<CryptoKeyPair>;
   getPublicKey(): Promise<CryptoKey>;
+  /**
+   * Optional: sign canonical grant bytes without exporting a private CryptoKey.
+   * Real KMS backends should implement this (e.g. AWS KMS Sign).
+   * When absent, AuthorizationOracle falls back to local ECDSA with the key pair.
+   */
+  signCanonical?(canonicalUtf8: string): Promise<ArrayBuffer>;
 }
 
 /**
@@ -45,7 +52,7 @@ export class DevelopmentInMemoryOracleKeyStore implements OracleKeyStore {
     if (!this.keyPair) {
       this.keyPair = await crypto.subtle.generateKey(
         { name: 'ECDSA', namedCurve: 'P-256' },
-        false, // non-extractable even in development
+        false,
         ['sign', 'verify']
       );
     }
@@ -84,29 +91,96 @@ export class HsmOracleKeyStore implements OracleKeyStore {
   }
 }
 
+export interface KmsOracleKeyStoreOptions {
+  /**
+   * `stub` — local ECDSA that documents the KMS Sign hook (no AWS credentials).
+   * `aws` — reserved; throws until a real AWS KMS client is wired.
+   */
+  mode?: 'stub' | 'aws';
+  keyId?: string;
+  /** Future: AWS KMS key ARN / alias. Ignored in stub mode. */
+  kmsKeyId?: string;
+  region?: string;
+}
+
 /**
- * [PRODUCTION STUB — NOT IMPLEMENTED]
- * Would wrap AWS KMS / GCP KMS / Azure Key Vault asymmetric signing.
+ * KMS signing backend.
+ *
+ * - mode=`stub` (TDCP_SIGNING_BACKEND=kms-stub): holds an in-process ECDSA P-256
+ *   key and implements `signCanonical` as the hook AWS KMS Sign would replace.
+ *   **Not production-grade** — no AWS credentials, no remote KMS.
+ * - mode=`aws`: throws until a real AWS SDK Sign path is implemented.
+ *
+ * Production plug-in checklist:
+ * 1. Call KMS Sign (ECDSA_SHA_256) on the canonical grant UTF-8 bytes.
+ * 2. Never export the private key to the Authority process.
+ * 3. Expose verify material via GetPublicKey → SPKI for clients.
  */
 export class KmsOracleKeyStore implements OracleKeyStore {
   public readonly kind = 'KMS' as const;
-  public readonly isProductionGrade = true;
-  public readonly developmentOnly = false;
+  public readonly isProductionGrade: boolean;
+  public readonly developmentOnly: boolean;
+
+  private readonly mode: 'stub' | 'aws';
+  private readonly keyId: string;
+  private readonly kmsKeyId?: string;
+  private readonly region?: string;
+  private keyPair: CryptoKeyPair | null = null;
+
+  constructor(options: KmsOracleKeyStoreOptions = {}) {
+    this.mode = options.mode ?? 'aws';
+    this.keyId =
+      options.keyId ||
+      (this.mode === 'stub' ? 'AUTHORITY-KEY-KMS-STUB' : 'ORACLE-KEY-KMS-UNIMPLEMENTED');
+    this.kmsKeyId = options.kmsKeyId;
+    this.region = options.region;
+    if (this.mode === 'stub') {
+      this.isProductionGrade = false;
+      this.developmentOnly = true;
+    } else {
+      this.isProductionGrade = true;
+      this.developmentOnly = false;
+    }
+  }
 
   public getKeyId(): string {
-    return 'ORACLE-KEY-KMS-UNIMPLEMENTED';
+    return this.keyId;
   }
 
   public async getOrCreateSigningKey(): Promise<CryptoKeyPair> {
-    throw new Error(
-      'KmsOracleKeyStore is a production stub. Wire a real KMS before deploying TDCP.'
-    );
+    if (this.mode === 'aws') {
+      throw new Error(
+        'KmsOracleKeyStore aws mode is not wired. Use TDCP_SIGNING_BACKEND=kms-stub for the documented hook, or implement AWS KMS Sign.'
+      );
+    }
+    if (!this.keyPair) {
+      this.keyPair = await crypto.subtle.generateKey(
+        { name: 'ECDSA', namedCurve: 'P-256' },
+        false,
+        ['sign', 'verify']
+      );
+    }
+    return this.keyPair;
   }
 
   public async getPublicKey(): Promise<CryptoKey> {
-    throw new Error(
-      'KmsOracleKeyStore is a production stub. Wire a real KMS before deploying TDCP.'
-    );
+    const pair = await this.getOrCreateSigningKey();
+    return pair.publicKey;
+  }
+
+  /**
+   * Hook point for AWS KMS Sign (ECDSA_SHA_256 over SHA-256 digest of canonical bytes).
+   * Stub: local WebCrypto ECDSA. Production: replace body with KMS Sign API call.
+   */
+  public async signCanonical(canonicalUtf8: string): Promise<ArrayBuffer> {
+    if (this.mode === 'aws') {
+      throw new Error(
+        `KmsOracleKeyStore.signCanonical aws mode not implemented (kmsKeyId=${this.kmsKeyId ?? 'unset'}, region=${this.region ?? 'unset'}).`
+      );
+    }
+    const pair = await this.getOrCreateSigningKey();
+    const data = new TextEncoder().encode(canonicalUtf8);
+    return crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, pair.privateKey, data);
   }
 }
 

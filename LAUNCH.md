@@ -14,9 +14,9 @@ Use this before any commercial “hosted Authority” claim. The browser Oracle 
 - [ ] Remote Authority deployed (not in-browser)
 - [ ] Durable revoke/replay verified across restart
 - [ ] **HSM/KMS** (or Secure Key Store) wired — replace file JWK signing
-- [ ] Admin register/revoke APIs authenticated (mTLS/OAuth)
+- [x] Admin register/revoke APIs authenticated (Bearer `TDCP_AUTHORITY_ADMIN_TOKEN`; mTLS/OAuth still preferred for Growth+)
 - [ ] `TDCP_AUTHORITY_URL` configured for clients
-- [ ] Backups + restore drill for Authority state
+- [ ] Backups + restore drill for Authority state (procedure in `docs/OPS.md`)
 
 ## Secrets & config
 
@@ -26,7 +26,7 @@ Use this before any commercial “hosted Authority” claim. The browser Oracle 
 
 ## Monitoring & support
 
-- [ ] Healthchecks (`/health` on Authority)
+- [x] Healthchecks (`/health`, `/ready`, `/metrics` on Authority)
 - [ ] Metrics: grant issue rate, revoke events, replay rejects, error codes
 - [ ] On-call / support path for design partners
 - [ ] Incident runbook (key compromise → rotate + revoke epochs)

@@ -22,6 +22,12 @@ import type {
 export interface HttpAuthorityClientOptions {
   baseUrl: string;
   fetchImpl?: typeof fetch;
+  /**
+   * Bearer token for admin endpoints (register / revoke / restore / lists).
+   * Prefer process env TDCP_AUTHORITY_ADMIN_TOKEN on issuer tooling — do NOT
+   * ship this token in public browser builds for production.
+   */
+  adminToken?: string;
 }
 
 async function importSpkiPublicKey(spkiBase64: string): Promise<CryptoKey> {
@@ -39,22 +45,30 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
   public readonly kind = 'HTTP_REMOTE' as const;
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
+  private readonly adminToken?: string;
   private cachedInfo: AuthorityPublicInfo | null = null;
   private cachedPublicKey: CryptoKey | null = null;
 
   constructor(options: HttpAuthorityClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, '');
     this.fetchImpl = options.fetchImpl ?? fetch;
+    this.adminToken = options.adminToken;
   }
 
   private async request<T>(
     method: string,
     path: string,
-    body?: unknown
+    body?: unknown,
+    opts?: { admin?: boolean }
   ): Promise<T> {
+    const headers: Record<string, string> = {};
+    if (body !== undefined) headers['content-type'] = 'application/json';
+    if (opts?.admin && this.adminToken) {
+      headers['authorization'] = `Bearer ${this.adminToken}`;
+    }
     const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
       method,
-      headers: body ? { 'content-type': 'application/json' } : undefined,
+      headers: Object.keys(headers).length ? headers : undefined,
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
     const text = await res.text();
@@ -122,7 +136,8 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
     const res = await this.request<{ wrapSecretBase64: string }>(
       'POST',
       '/v1/documents/register',
-      policy
+      policy,
+      { admin: true }
     );
     return new Uint8Array(base64ToArrayBuffer(res.wrapSecretBase64));
   }
@@ -146,7 +161,9 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
   public async listRegisteredPolicies(): Promise<RegisteredDocumentPolicy[]> {
     const res = await this.request<{ policies: RegisteredDocumentPolicy[] }>(
       'GET',
-      '/v1/documents'
+      '/v1/documents',
+      undefined,
+      { admin: true }
     );
     return res.policies;
   }
@@ -186,15 +203,21 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
     reason?: string,
     revokedBy?: string
   ): Promise<DocumentRevocationState> {
-    return this.request<DocumentRevocationState>('POST', '/v1/revoke', {
-      documentId,
-      reason,
-      revokedBy,
-    });
+    return this.request<DocumentRevocationState>(
+      'POST',
+      '/v1/revoke',
+      { documentId, reason, revokedBy },
+      { admin: true }
+    );
   }
 
   public async restoreDocument(documentId: string): Promise<DocumentRevocationState> {
-    return this.request<DocumentRevocationState>('POST', '/v1/restore', { documentId });
+    return this.request<DocumentRevocationState>(
+      'POST',
+      '/v1/restore',
+      { documentId },
+      { admin: true }
+    );
   }
 
   public async getDocumentRevocationState(
@@ -207,7 +230,12 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
   }
 
   public async listRevoked(): Promise<DocumentRevocationState[]> {
-    const res = await this.request<{ revoked: DocumentRevocationState[] }>('GET', '/v1/revoked');
+    const res = await this.request<{ revoked: DocumentRevocationState[] }>(
+      'GET',
+      '/v1/revoked',
+      undefined,
+      { admin: true }
+    );
     return res.revoked;
   }
 }
