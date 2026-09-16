@@ -57,8 +57,15 @@ If dependencies are not installed in the environment, install them before runnin
 
 ## Product position
 
-This version is a serious protocol reference/demo, not a declaration of formal cryptographic security or production readiness. The correct next milestone is independent validation of the TDCP protocol and migration of the Authorization Oracle to a separately deployed control plane.
+Canonical product definition: **[`PRODUCT.md`](PRODUCT.md)** — TDCP separates encrypted packages from authorization to operate on them (*copying ciphertext does not copy authorization*).
 
+**Build toward:** (1) protocol + Gatekeeper reference, (2) remote Authorization Authority, (3) TS SDK / integrator surface, (4) optional ATL Edge bridge later (design only).
+
+**Not building next (~2 quarters):** full IRM SaaS parity, Firebase/Gemini control plane, HSM claims for the browser Oracle, Office plugins / email gateway / CASB listing.
+
+**ICP:** secure data rooms, regulated file exchange, and agent pipelines that need operation-scoped unlocks with revoke/replay. See also [`MARKET.md`](MARKET.md), [`ROADMAP.md`](ROADMAP.md). Spanish founder summary: [`docs/PRODUCT_ES.md`](docs/PRODUCT_ES.md).
+
+This version remains a serious protocol reference/demo, not a declaration of formal cryptographic security or production readiness (see [`AUDIT_2.5.1.md`](AUDIT_2.5.1.md)). The next commercial credibility milestone is a remote Authorization Authority with durable revoke/replay — not IRM feature parity.
 
 ## How to run
 
@@ -67,5 +74,5 @@ This version is a serious protocol reference/demo, not a declaration of formal c
 # open http://127.0.0.1:8080/
 ```
 
-See also: `DEPLOY.md`, `ARCHITECTURE.md`, `MARKET.md`, `AUDIT_2.5.1.md`.
+See also: `PRODUCT.md`, `ROADMAP.md`, `DEPLOY.md`, `ARCHITECTURE.md`, `MARKET.md`, `AUDIT_2.5.1.md`, `docs/PRODUCT_ES.md`.
 Python sketch (demo only): `sdk/python/`.
