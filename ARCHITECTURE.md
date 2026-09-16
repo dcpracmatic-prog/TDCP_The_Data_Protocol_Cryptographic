@@ -1,5 +1,7 @@
 # TDCP Architecture
 
+Product definition and Authority roadmap: see **`PRODUCT.md`** and **`ROADMAP.md`** (P0 remote Authorization Authority).
+
 ## Core invariant
 
 > **Copying the ciphertext does not copy the authorization.**
