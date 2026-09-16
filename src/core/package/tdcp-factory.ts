@@ -6,6 +6,8 @@
  */
 
 import type { AuthorizationOracle } from '../../oracle/authorization-oracle.ts';
+import type { AuthorizationAuthority } from '../../authority/types.ts';
+import { InProcessAuthority } from '../../authority/in-process-authority.ts';
 import type { PolicyLevel } from '../authorization/types.ts';
 import {
   generateRandomBytes,
@@ -39,7 +41,10 @@ export interface CreateTDCPPackageInput {
   viewOnce?: boolean;
   watermarkRequired?: boolean;
   blurMode?: boolean;
-  oracle: AuthorizationOracle;
+  /** Preferred: Authorization Authority (in-process or remote). */
+  authority?: AuthorizationAuthority;
+  /** @deprecated Prefer `authority`. Kept for existing callers/tests. */
+  oracle?: AuthorizationOracle;
 }
 
 /**
@@ -56,7 +61,14 @@ export async function createTDCPPackage(input: CreateTDCPPackageInput): Promise<
   const iv = generateRandomBytes(12);
   const createdAt = Date.now();
 
-  const oracleWrapSecret = input.oracle.registerDocumentPolicy({
+  const authority =
+    input.authority ??
+    (input.oracle ? new InProcessAuthority(input.oracle) : null);
+  if (!authority) {
+    throw new Error('AUTHORITY_REQUIRED: createTDCPPackage requires authority or oracle');
+  }
+
+  const oracleWrapSecret = await authority.registerDocumentPolicy({
     documentId,
     packageId,
     policyLevel: input.policyLevel,

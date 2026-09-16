@@ -10,6 +10,11 @@
 
 import { globalAuthorizationOracle } from '../oracle/authorization-oracle.ts';
 import type { AuthorizationOracle } from '../oracle/authorization-oracle.ts';
+import type { AuthorizationAuthority } from '../authority/types.ts';
+import {
+  resolveAuthorizationAuthority,
+  readAuthorityUrlFromEnv,
+} from '../authority/resolve-authority.ts';
 import { globalAuditSink, TDCP_AUDIT_UPDATED_EVENT } from '../audit/audit-sink.ts';
 import type { AuditSink } from '../audit/audit-sink.ts';
 import { DCPGatekeeper } from '../gatekeeper/gatekeeper.ts';
@@ -49,6 +54,7 @@ export interface CreatePackageRequest {
 
 export class TdcpRuntime {
   public readonly oracle: AuthorizationOracle;
+  public readonly authority: AuthorizationAuthority;
   public readonly auditSink: AuditSink;
   public readonly nfcProvider: NFCProvider;
   public readonly deviceProvider: DeviceIdentityProvider;
@@ -57,6 +63,7 @@ export class TdcpRuntime {
 
   constructor() {
     this.oracle = globalAuthorizationOracle;
+    this.authority = resolveAuthorizationAuthority({ oracle: this.oracle });
     this.auditSink = globalAuditSink;
     this.nfcProvider = new MockNFCProvider();
     this.deviceProvider = new MockDeviceIdentityProvider();
@@ -65,7 +72,14 @@ export class TdcpRuntime {
   }
 
   public getProviderStatus() {
+    const authorityUrl = readAuthorityUrlFromEnv();
     return {
+      authorityKind: this.authority.kind,
+      authorityUrl: authorityUrl ?? null,
+      modeBadge:
+        this.authority.kind === 'HTTP_REMOTE'
+          ? 'Production path — remote Authority (TDCP_AUTHORITY_URL)'
+          : 'Reference / Demo — Oracle in-browser',
       oracleKeyStore: this.oracle.getKeyStoreKind(),
       oracleKeyStoreDevelopmentOnly: this.oracle.isDevelopmentKeyStore(),
       nfc: {
@@ -97,6 +111,7 @@ export class TdcpRuntime {
   }> {
     const pkg = await createTDCPPackage({
       ...req,
+      authority: this.authority,
       oracle: this.oracle,
     });
 
@@ -136,13 +151,21 @@ export class TdcpRuntime {
       nfcProvider: this.nfcProvider,
       deviceProvider: this.deviceProvider,
       biometricProvider: this.biometricProvider,
+      authority: this.authority,
       oracle: this.oracle,
       auditSink: this.auditSink,
     });
   }
 
+  /**
+   * Sync revoke for the in-process demo Monitor panel.
+   * When authority is HTTP_REMOTE, prefer revokeDocumentAsync().
+   */
   public revokeDocument(documentId: string, reason?: string) {
     const state = this.oracle.getRevocationManager().revokeDocument(documentId, reason);
+    if (this.authority.kind === 'HTTP_REMOTE') {
+      void this.authority.revokeDocument(documentId, reason);
+    }
     void this.auditSink.recordEvent({
       documentId,
       packageId: this.oracle.getDocumentPolicy(documentId)?.packageId || 'UNKNOWN',
@@ -157,8 +180,27 @@ export class TdcpRuntime {
     return state;
   }
 
+  public async revokeDocumentAsync(documentId: string, reason?: string) {
+    const state = await this.authority.revokeDocument(documentId, reason);
+    void this.auditSink.recordEvent({
+      documentId,
+      packageId: (await this.authority.getDocumentPolicy(documentId))?.packageId || 'UNKNOWN',
+      deviceId: 'SECURITY_OFFICER',
+      credentialId: 'SECURITY_OFFICER',
+      operationId: `REVOKE-${documentId}`,
+      operation: 'KILL_SWITCH_ENGAGED',
+      policy: (await this.authority.getDocumentPolicy(documentId))?.policyLevel || 'STANDARD',
+      result: 'DENIED',
+      details: `Documento revocado via Authority. epoch=${state.currentEpoch}.`,
+    });
+    return state;
+  }
+
   public restoreDocument(documentId: string) {
     const state = this.oracle.getRevocationManager().restoreDocument(documentId);
+    if (this.authority.kind === 'HTTP_REMOTE') {
+      void this.authority.restoreDocument(documentId);
+    }
     void this.auditSink.recordEvent({
       documentId,
       packageId: this.oracle.getDocumentPolicy(documentId)?.packageId || 'UNKNOWN',

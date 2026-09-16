@@ -240,6 +240,17 @@ export default function AuthScreen() {
           <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-[10px] text-purple-300">
             <ShieldCheck className="w-3 h-3 text-purple-400" /> Autenticación Obligatoria de Acceso
           </div>
+          <div className="mt-2 max-w-sm space-y-1.5 text-center">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-0.5 text-[10px] font-bold tracking-wide text-amber-200 uppercase">
+              Reference / Demo — Oracle in-browser
+            </div>
+            <p className="text-[10px] leading-relaxed text-white/45">
+              Local account shell only (not a production IdP). Create an account under{' '}
+              <span className="font-semibold text-white/70">Crear Cuenta</span> to reach Encrypt/Decrypt.
+              Crypto is never bypassed. Production path: set{' '}
+              <span className="font-mono text-emerald-300/90">TDCP_AUTHORITY_URL</span>.
+            </p>
+          </div>
         </div>
 
         {/* Tab Selector */}

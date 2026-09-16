@@ -2,6 +2,16 @@
 
 TDCP (The Data Cryptographic Protocol) is the protocol layer used by this application to separate encrypted data from authorization to operate on that data.
 
+
+## Production launch foundation
+
+- Product: [`PRODUCT.md`](./PRODUCT.md) · Roadmap: [`ROADMAP.md`](./ROADMAP.md)
+- Authority design: [`docs/AUTHORITY.md`](./docs/AUTHORITY.md)
+- Integrator API: [`docs/INTEGRATOR_API.md`](./docs/INTEGRATOR_API.md)
+- Launch checklist: [`LAUNCH.md`](./LAUNCH.md) · GTM sketch: [`docs/GTM.md`](./docs/GTM.md)
+- Local Authority + web: `./scripts/start-prod-stack.sh` or `docker compose up --build`
+
+
 ## Core invariant
 
 > Copying the ciphertext does not copy the authorization.

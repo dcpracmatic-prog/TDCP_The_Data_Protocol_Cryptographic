@@ -2,13 +2,14 @@
 
 ## Security notice (read first)
 
-The Authorization Oracle in this build runs **in the browser / same process** as the UI. That is a **reference control plane**, not a production security boundary.
+The default Authorization Oracle runs **in the browser / same process** as the UI. That is a **reference control plane**, not a production security boundary.
 
 - A compromised browser/JS environment can inspect or alter Oracle state.
 - Do **not** treat local or static hosting of this demo as “sovereign” authorization.
-- Production requires a remote Authorization Authority with durable state and HSM/KMS-backed keys (see `ARCHITECTURE.md`).
+- Production requires a **remote Authorization Authority** with durable state and HSM/KMS-backed keys (see `docs/AUTHORITY.md`, `ARCHITECTURE.md`).
+- The file-backed Authority MVP in `server/authority/` is durable across restart but is **still not HSM**.
 
-## Local development
+## Local development (web only)
 
 ```bash
 # from repo root
@@ -35,23 +36,41 @@ npm run build
 
 `npm run build` also runs DB migrate; without `DATABASE_URL` the migrate step skips (PGLite path).
 
-## Docker (dev-oriented)
+## Local prod-stack (Authority + web)
 
-A simple container that serves the Vite app on port 8080:
+One command:
+
+```bash
+./scripts/start-prod-stack.sh
+# Prefer: docker compose up --build
+# Authority → http://127.0.0.1:8787/health
+# Web       → http://127.0.0.1:8080/
+```
+
+Set clients to:
+
+```bash
+export TDCP_AUTHORITY_URL=http://127.0.0.1:8787
+# browser builds may use:
+export VITE_TDCP_AUTHORITY_URL=http://127.0.0.1:8787
+```
+
+Authority-only:
+
+```bash
+npm run authority
+# or: node --experimental-strip-types server/authority/index.ts
+```
+
+## Docker Compose
 
 ```bash
 docker compose up --build
-# → http://127.0.0.1:8080/
+# services: authority (:8787) + web (:8080)
+# volume: authority-data → /data/authority
 ```
 
-Or:
-
-```bash
-docker build -t tdcp-web .
-docker run --rm -p 8080:8080 tdcp-web
-```
-
-This is for local/demo convenience. It does **not** harden the Oracle.
+Healthchecks are defined for both services. This stack exercises the remote Authority path; it does **not** provide HSM.
 
 ## Static / preview build
 
@@ -63,11 +82,17 @@ npm run preview
 
 Preview defaults follow the App Builder scripts (see `scripts/preview.mjs`; preview port is typically **8081**). The primary **dev** URL remains **http://127.0.0.1:8080/**.
 
-For a pure static host, you still must understand that auth/Oracle semantics in this reference build are client-side; hosting `dist/` alone does not create a remote authorization boundary.
+Hosting `dist/` alone does not create a remote authorization boundary unless clients point at a live Authority.
 
 ## Environment
 
-See `.env.example`. Never commit secrets (`BETTER_AUTH_SECRET`, real `DATABASE_URL` credentials, provider keys). Auth is off by default (`VITE_AUTH_ENABLED=false`) for local preview.
+See `.env.example`. Never commit secrets (`BETTER_AUTH_SECRET`, real `DATABASE_URL` credentials, Authority signing JWKs under `data/authority/`).
+
+## Demo vs production UI
+
+- **Reference / Demo — Oracle in-browser** when `TDCP_AUTHORITY_URL` is unset
+- **Production path — set TDCP_AUTHORITY_URL** when pointing at remote Authority
+- Create a local demo account via AuthScreen “Crear Cuenta” (localStorage shell — not production IdP). See AuthScreen evaluator hints when `VITE_TDCP_DEMO_MODE=1`.
 
 ## Firebase / Gemini
 
@@ -75,5 +100,4 @@ This product tree must **not** include Firebase, Gemini, or AI Studio `server.ts
 
 ## CI workflow file
 
-GitHub Actions YAML lives at `docs/ci.github.yml` (copy into `.github/workflows/ci.yml` with a token that has the `workflow` scope). The OAuth app used for this seed push could not create workflow files directly.
-
+GitHub Actions YAML lives at `docs/ci.github.yml` (copy into `.github/workflows/ci.yml` with a token that has the `workflow` scope). Includes Authority tests via `npm test`.
