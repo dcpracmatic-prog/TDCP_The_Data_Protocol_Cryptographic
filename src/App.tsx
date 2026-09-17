@@ -121,11 +121,11 @@ function MainDCPApp() {
       <div className="mesh-bg" />
       <div className="flex h-dvh w-full flex-col overflow-hidden text-white">
         {/* Compact top bar — logo + Authority chip + Menu */}
-        <header className="glass-panel relative z-40 mx-3 mt-3 flex shrink-0 items-center justify-between gap-3 rounded-2xl px-3 py-2.5 md:mx-6 md:mt-4 md:px-4">
+        <header className="glass-panel relative z-40 mx-2 mt-2 flex shrink-0 items-center justify-between gap-2 rounded-xl px-2.5 py-1.5 md:mx-4 md:mt-3 md:px-3">
           <div className="flex min-w-0 items-center gap-2.5 md:gap-3.5">
-            <DcpCrystalIcon className="h-9 w-9 shrink-0 md:h-10 md:w-10" />
+            <DcpCrystalIcon className="h-7 w-7 shrink-0 md:h-8 md:w-8" />
             <div className="flex min-w-0 flex-col">
-              <span className="bg-gradient-to-r from-pink-300 via-purple-300 to-indigo-300 bg-clip-text text-sm font-black tracking-wider text-transparent md:text-base">
+              <span className="bg-gradient-to-r from-pink-300 via-purple-300 to-indigo-300 bg-clip-text text-xs font-black tracking-wider text-transparent md:text-sm">
                 TDCP SECURE
               </span>
               <span className="truncate font-mono text-[9px] tracking-widest text-white/50 uppercase">
@@ -141,7 +141,7 @@ function MainDCPApp() {
               onClick={() => setMenuOpen((o) => !o)}
               aria-expanded={menuOpen}
               aria-controls="tdcp-nav-drawer"
-              className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-bold tracking-wider text-white uppercase hover:bg-white/10"
+              className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/15 bg-white/5 px-2.5 py-1.5 text-[11px] font-bold tracking-wider text-white uppercase hover:bg-white/10"
             >
               {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
               <span className="hidden sm:inline">Menú</span>
@@ -305,10 +305,10 @@ function MainDCPApp() {
         )}
 
         {/* Full-width main content */}
-        <div className="mx-3 mt-3 mb-3 flex min-h-0 flex-1 flex-col overflow-hidden md:mx-6 md:mb-4 md:mt-4">
+        <div className="mx-2 mt-2 mb-2 flex min-h-0 flex-1 flex-col overflow-hidden md:mx-4 md:mb-3 md:mt-3">
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <AuthorityStatusBar />
-            <div className="mb-3 shrink-0">
+            <div className="mb-2 shrink-0">
               <CollapsibleSection
                 title="Almacenamiento"
                 subtitle="Google Drive · carpetas compartidas"
@@ -318,8 +318,8 @@ function MainDCPApp() {
                 <GoogleDriveBar />
               </CollapsibleSection>
             </div>
-            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-              <div className="mx-auto w-full max-w-6xl pb-4">
+            <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
+              <div className="flex min-h-0 w-full flex-1 flex-col">
                 {activeTab === 'Decrypt' && <DecryptPanel />}
                 {activeTab === 'Encrypt' && <EncryptPanel />}
                 {activeTab === 'Monitor' && <MonitorPanel />}

@@ -48,7 +48,7 @@ export default function CollapsibleSection({
       onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
       className={`glass-card group border-l-2 ${accentBorder[accent]} overflow-hidden ${className}`}
     >
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 select-none [&::-webkit-details-marker]:hidden">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 select-none [&::-webkit-details-marker]:hidden">
         <div className="min-w-0">
           <div className={`text-xs font-bold tracking-wider uppercase ${accentText[accent]}`}>
             {title}
@@ -61,7 +61,7 @@ export default function CollapsibleSection({
           className={`h-4 w-4 shrink-0 text-white/40 transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </summary>
-      <div className="space-y-3 border-t border-white/5 px-4 py-4">{children}</div>
+      <div className="space-y-2.5 border-t border-white/5 px-3 py-3">{children}</div>
     </details>
   );
 }

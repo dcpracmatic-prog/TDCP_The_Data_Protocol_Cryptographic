@@ -232,30 +232,30 @@ export default function DecryptPanel() {
   };
 
   return (
-    <div className="flex h-full min-h-0 select-none flex-col gap-6" onContextMenu={(e) => e.preventDefault()}>
-      <div className="glass-panel relative flex flex-1 flex-col overflow-y-auto p-6">
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="flex items-center gap-2 text-xl font-bold text-indigo-400">
-            <Unlock className="h-5 w-5" /> TDCP · Gatekeeper
+    <div className="flex h-full min-h-0 select-none flex-col gap-2" onContextMenu={(e) => e.preventDefault()}>
+      <div className="glass-panel relative flex min-h-0 flex-1 flex-col overflow-y-auto p-3 md:p-4">
+        <div className="mb-2 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="flex items-center gap-2 text-base font-bold text-indigo-400">
+            <Unlock className="h-4 w-4" /> TDCP · Gatekeeper
           </h2>
-          <div className="flex w-fit items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-[11px] text-indigo-300">
-            <ShieldCheck className="h-3.5 w-3.5" /> Sin bypass de contraseña
+          <div className="flex w-fit items-center gap-1.5 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-0.5 text-[10px] text-indigo-300">
+            <ShieldCheck className="h-3 w-3" /> Sin bypass de contraseña
           </div>
         </div>
 
         {!result ? (
-          <div className="mx-auto mt-2 grid w-full max-w-6xl grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
-            <div className="flex flex-col gap-4">
+          <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
+            <div className="flex flex-col gap-3">
             <CollapsibleSection
               title="1. Apertura"
               subtitle="Paquete · operación · factores · unlock"
               accent="indigo"
               defaultOpen
             >
-              <div className="space-y-5">
+              <div className="space-y-3">
                 <div>
-                  <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <label className="text-xs font-bold text-white/50 uppercase">TDCPPackage (.pkg)</label>
+                  <div className="mb-1.5 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                    <label className="text-[11px] font-bold text-white/50 uppercase">TDCPPackage (.pkg)</label>
                     {isSignedIn && (
                       <div className="flex flex-wrap items-center gap-2">
                         <button
@@ -307,14 +307,14 @@ export default function DecryptPanel() {
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-xs font-bold text-white/50 uppercase">Operación solicitada</label>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <label className="mb-1.5 block text-[11px] font-bold text-white/50 uppercase">Operación solicitada</label>
+                  <div className="grid grid-cols-2 gap-1.5">
                     {(['READ', 'RENDER_RAM', 'EXTRACT', 'AUDIT_EXPORT'] as TDCPRequestedOperation[]).map((op) => (
                       <button
                         key={op}
                         type="button"
                         onClick={() => setOperation(op)}
-                        className={`rounded-lg border px-2 py-2 text-[10px] font-bold ${
+                        className={`rounded-lg border px-2 py-1.5 text-[10px] font-bold ${
                           operation === op
                             ? 'border-indigo-500/60 bg-indigo-500/20 text-indigo-200'
                             : 'border-white/10 bg-black/30 text-white/50'
@@ -326,43 +326,43 @@ export default function DecryptPanel() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="grid grid-cols-2 gap-1.5">
                   <button
                     type="button"
                     onClick={tapCredential}
-                    className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-xs font-bold ${
+                    className={`flex items-center justify-center gap-1.5 rounded-lg border p-2 text-[11px] font-bold ${
                       credentialReady
                         ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
                         : 'border-white/10 bg-white/5 text-white/70'
                     }`}
                   >
-                    <CreditCard className="h-4 w-4" />
-                    {credentialReady ? 'Credencial leída' : 'Leer credencial NFC'}
+                    <CreditCard className="h-3.5 w-3.5" />
+                    {credentialReady ? 'Credencial OK' : 'Credencial NFC'}
                   </button>
                   <button
                     type="button"
                     onClick={bindDevice}
-                    className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-xs font-bold ${
+                    className={`flex items-center justify-center gap-1.5 rounded-lg border p-2 text-[11px] font-bold ${
                       deviceReady
                         ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
                         : 'border-white/10 bg-white/5 text-white/70'
                     }`}
                   >
-                    <Cpu className="h-4 w-4" />
-                    {deviceReady ? 'Dispositivo ligado' : 'Identidad de dispositivo'}
+                    <Cpu className="h-3.5 w-3.5" />
+                    {deviceReady ? 'Dispositivo OK' : 'Dispositivo'}
                   </button>
                 </div>
 
                 <div>
-                  <label className="mb-2 flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
-                    <KeyRound className="h-4 w-4" /> Factor de contraseña (insuficiente sola)
+                  <label className="mb-1.5 flex items-center gap-2 text-[11px] font-bold text-white/50 uppercase">
+                    <KeyRound className="h-3.5 w-3.5" /> Factor de contraseña (insuficiente sola)
                   </label>
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Factor adicional — el Gatekeeper decide"
-                    className="w-full rounded border border-white/10 bg-white/5 p-3 font-mono text-sm text-white outline-none focus:border-indigo-500/50"
+                    className="w-full rounded border border-white/10 bg-white/5 p-2.5 font-mono text-sm text-white outline-none focus:border-indigo-500/50"
                   />
                 </div>
 
@@ -377,46 +377,80 @@ export default function DecryptPanel() {
                 <button
                   disabled={isUnlocking || !pkg}
                   onClick={processUnlock}
-                  className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-indigo-500/50 bg-indigo-500/20 p-4 font-bold tracking-wider text-indigo-300 uppercase hover:bg-indigo-500/30 disabled:opacity-50"
+                  className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-indigo-500/50 bg-indigo-500/20 p-3 text-sm font-bold tracking-wider text-indigo-300 uppercase hover:bg-indigo-500/30 disabled:opacity-50"
                 >
-                  <Unlock className="h-5 w-5" />
+                  <Unlock className="h-4 w-4" />
                   {isUnlocking ? 'Oracle + Gatekeeper...' : 'Solicitar grant y abrir en runtime'}
                 </button>
               </div>
             </CollapsibleSection>
             </div>
 
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
             <CollapsibleSection
-              title="Camino real"
-              subtitle="Flujo de autorización · formatos"
-              accent="cyan"
-              defaultOpen={false}
+              title="2. Resultado / estado"
+              subtitle="Checklist de factores · paquete"
+              accent="emerald"
+              defaultOpen
             >
-              <p className="text-xs leading-relaxed text-white/60">
-                Paquete → operación → credencial → dispositivo → Oracle → grant firmado de un solo uso →
-                Gatekeeper verifica → clave efímera → AES-GCM → runtime controlado → auditoría → apoptosis.
-                No existe password → JavaScript local → AES → plaintext.
-              </p>
-              <div className="mt-3 grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
-                <div className="flex items-center gap-2 rounded border border-white/5 bg-white/5 p-2 text-white/80">
-                  <FileText className="h-4 w-4 text-indigo-400" /> Documentos
+              <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                <div className={`rounded-lg border p-2 ${pkg ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-white/10 bg-black/30 text-white/45'}`}>
+                  <div className="text-[9px] font-bold tracking-wider uppercase opacity-70">Paquete</div>
+                  <div className="mt-0.5 truncate font-mono font-semibold">{pkg ? pkg.metadata.policyLevel : '—'}</div>
                 </div>
-                <div className="flex items-center gap-2 rounded border border-white/5 bg-white/5 p-2 text-white/80">
-                  <ImageIcon className="h-4 w-4 text-emerald-400" /> Imágenes
+                <div className={`rounded-lg border p-2 ${operation ? 'border-indigo-500/40 bg-indigo-500/10 text-indigo-200' : 'border-white/10 bg-black/30 text-white/45'}`}>
+                  <div className="text-[9px] font-bold tracking-wider uppercase opacity-70">Operación</div>
+                  <div className="mt-0.5 truncate font-mono font-semibold">{operation}</div>
                 </div>
-                <div className="flex items-center gap-2 rounded border border-white/5 bg-white/5 p-2 text-white/80">
-                  <Music className="h-4 w-4 text-pink-400" /> Audio
+                <div className={`rounded-lg border p-2 ${credentialReady ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-amber-500/30 bg-amber-500/5 text-amber-200/80'}`}>
+                  <div className="text-[9px] font-bold tracking-wider uppercase opacity-70">Credencial</div>
+                  <div className="mt-0.5 font-semibold">{credentialReady ? 'Lista' : 'Pendiente'}</div>
                 </div>
-                <div className="flex items-center gap-2 rounded border border-white/5 bg-white/5 p-2 text-white/80">
-                  <Video className="h-4 w-4 text-purple-400" /> Video
+                <div className={`rounded-lg border p-2 ${deviceReady ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-amber-500/30 bg-amber-500/5 text-amber-200/80'}`}>
+                  <div className="text-[9px] font-bold tracking-wider uppercase opacity-70">Dispositivo</div>
+                  <div className="mt-0.5 font-semibold">{deviceReady ? 'Ligado' : 'Pendiente'}</div>
                 </div>
               </div>
-              <div className="mt-3 flex items-start gap-2 rounded bg-black/30 p-2.5 text-[11px] text-white/50">
-                <Archive className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400/80" />
-                EXTRACT sólo si el Oracle emitió un grant con allowExtraction.
+              {pkg && (
+                <div className="mt-2 break-all rounded border border-white/5 bg-black/30 p-2 font-mono text-[10px] text-white/60">
+                  DOC={pkg.documentId}
+                  <br />
+                  PKG={pkg.packageId}
+                </div>
+              )}
+              <div className="mt-2 grid grid-cols-2 gap-1.5 text-[10px]">
+                <div className="flex items-center gap-1.5 rounded bg-black/20 p-1.5 text-white/70">
+                  <FileText className="h-3 w-3 text-indigo-400" /> Docs
+                </div>
+                <div className="flex items-center gap-1.5 rounded bg-black/20 p-1.5 text-white/70">
+                  <ImageIcon className="h-3 w-3 text-emerald-400" /> Imágenes
+                </div>
+                <div className="flex items-center gap-1.5 rounded bg-black/20 p-1.5 text-white/70">
+                  <Music className="h-3 w-3 text-pink-400" /> Audio
+                </div>
+                <div className="flex items-center gap-1.5 rounded bg-black/20 p-1.5 text-white/70">
+                  <Video className="h-3 w-3 text-purple-400" /> Video
+                </div>
               </div>
             </CollapsibleSection>
+
+            <details className="glass-card border-l-2 border-l-cyan-500 overflow-hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-[11px] font-bold tracking-wider text-cyan-300 uppercase select-none [&::-webkit-details-marker]:hidden">
+                Camino real · formato
+                <Info className="h-3.5 w-3.5 text-white/40" />
+              </summary>
+              <div className="space-y-2 border-t border-white/5 px-3 py-3">
+                <p className="text-[11px] leading-relaxed text-white/55">
+                  Paquete → operación → credencial → dispositivo → Oracle → grant de un solo uso →
+                  Gatekeeper → clave efímera → AES-GCM → runtime → auditoría → apoptosis.
+                  No existe password → JS local → AES → plaintext.
+                </p>
+                <div className="flex items-start gap-2 rounded bg-black/30 p-2 text-[10px] text-white/45">
+                  <Archive className="mt-0.5 h-3 w-3 shrink-0 text-amber-400/80" />
+                  EXTRACT sólo con grant allowExtraction del Oracle.
+                </div>
+              </div>
+            </details>
             </div>
           </div>
         ) : (
@@ -541,7 +575,7 @@ export default function DecryptPanel() {
         )}
       </div>
 
-      <div className="glass-card mx-auto h-28 w-full max-w-6xl overflow-y-auto border-l-2 border-l-indigo-500 bg-black/40 p-4 font-mono text-[11px] whitespace-pre-wrap text-white/60">
+      <div className="glass-card h-16 shrink-0 overflow-y-auto border-l-2 border-l-indigo-500 bg-black/40 p-2 font-mono text-[10px] leading-snug whitespace-pre-wrap text-white/55">
         {logs}
       </div>
     </div>

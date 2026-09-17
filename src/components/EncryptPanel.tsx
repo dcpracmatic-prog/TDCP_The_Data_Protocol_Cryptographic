@@ -254,42 +254,39 @@ La contraseña es un factor adicional, no una llave de apertura.`;
 
   if (encryptionResult) {
     return (
-      <div className="flex h-full min-h-0 flex-col gap-6">
-        <div className="glass-panel flex flex-1 flex-col overflow-y-auto p-6 md:p-8">
-          <div className="mb-6 text-center">
-            <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-emerald-500/50 bg-emerald-500/20 shadow-[0_0_30px_rgba(52,211,153,0.3)]">
-              <CheckCircle className="h-7 w-7 text-emerald-400" />
+      <div className="flex h-full min-h-0 flex-col gap-2">
+        <div className="glass-panel flex min-h-0 flex-1 flex-col overflow-y-auto p-3 md:p-4">
+          <div className="mb-3 flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-emerald-500/50 bg-emerald-500/20">
+              <CheckCircle className="h-5 w-5 text-emerald-400" />
             </div>
-            <h2 className="mb-1 text-2xl font-bold text-white">TDCPPackage sellado</h2>
-            <p className="text-sm font-medium text-emerald-400">
-              <span className="font-mono font-bold text-white">{encryptionResult.pkgFileName}</span>
-            </p>
-            <p className="mt-2 text-[11px] text-white/50">
-              El archivo es ciphertext. La autorización vive en el Oracle.
-            </p>
+            <div className="min-w-0">
+              <h2 className="text-base font-bold text-white">TDCPPackage sellado</h2>
+              <p className="truncate font-mono text-xs text-emerald-400">{encryptionResult.pkgFileName}</p>
+            </div>
           </div>
 
-          <div className="mx-auto mb-8 grid w-full max-w-6xl grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
+          <div className="mb-3 grid w-full grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
             <div className="flex flex-col space-y-4">
-              <div className="glass-card flex-1 border-l-2 border-l-emerald-500 p-6">
-                <h3 className="mb-4 flex items-center gap-2 text-xs font-bold tracking-wider text-white/60 uppercase">
-                  <ShieldAlert className="h-4 w-4 text-emerald-400" /> Política registrada
+              <div className="glass-card flex-1 border-l-2 border-l-emerald-500 p-3">
+                <h3 className="mb-2 flex items-center gap-2 text-[11px] font-bold tracking-wider text-white/60 uppercase">
+                  <ShieldAlert className="h-3.5 w-3.5 text-emerald-400" /> Política registrada
                 </h3>
-                <ul className="space-y-3">
+                <ul className="space-y-1.5">
                   {encryptionResult.summary.map((item, idx) => (
-                    <li key={idx} className="flex items-start gap-2.5 text-xs text-white/80 md:text-sm">
+                    <li key={idx} className="flex items-start gap-2 text-[11px] text-white/80">
                       <span className="mt-0.5 font-bold text-emerald-400">•</span>
                       <span className="leading-relaxed">{item}</span>
                     </li>
                   ))}
                 </ul>
               </div>
-              <div className="glass-card border-l-2 border-l-pink-500 p-5">
-                <h3 className="mb-1 flex items-center gap-2 text-xs font-bold tracking-wider text-white/60 uppercase">
-                  <Activity className="h-4 w-4 text-pink-400" /> Clave de monitoreo (epoch / kill-switch)
+              <div className="glass-card border-l-2 border-l-pink-500 p-3">
+                <h3 className="mb-1 flex items-center gap-2 text-[11px] font-bold tracking-wider text-white/60 uppercase">
+                  <Activity className="h-3.5 w-3.5 text-pink-400" /> Clave de monitoreo (epoch / kill-switch)
                 </h3>
-                <p className="mb-3 text-[11px] leading-relaxed text-white/60">
-                  Revoca el documento en el Oracle. Incrementa epoch. No usa localStorage.
+                <p className="mb-2 text-[10px] leading-snug text-white/50" title="Revoca el documento en el Oracle. Incrementa epoch. No usa localStorage.">
+                  Revoca en Oracle · epoch++ · no localStorage
                 </p>
                 <div className="flex gap-2">
                   <input
@@ -310,20 +307,20 @@ La contraseña es un factor adicional, no una llave de apertura.`;
             </div>
 
             <div className="flex flex-col space-y-4">
-              <div className="glass-card flex flex-1 flex-col justify-between border-l-2 border-l-indigo-500 p-6">
+              <div className="glass-card flex flex-1 flex-col justify-between border-l-2 border-l-indigo-500 p-3">
                 <div>
-                  <h3 className="mb-3 flex items-center gap-2 text-xs font-bold tracking-wider text-indigo-400 uppercase">
-                    <Share2 className="h-4 w-4" /> Distribución de ciphertext
+                  <h3 className="mb-1.5 flex items-center gap-2 text-[11px] font-bold tracking-wider text-indigo-400 uppercase">
+                    <Share2 className="h-3.5 w-3.5" /> Distribución de ciphertext
                   </h3>
-                  <p className="mb-5 text-xs leading-relaxed text-white/70">
-                    Google Drive, descarga o compartir nativo almacenan bytes cifrados. Ninguno autoriza.
+                  <p className="mb-2 text-[10px] leading-snug text-white/55">
+                    Drive / descarga / compartir = bytes cifrados. Ninguno autoriza.
                   </p>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {isSignedIn && (
                       <button
                         onClick={handleUploadToDriveFolder}
                         disabled={isUploadingToDrive}
-                        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-indigo-500/60 bg-indigo-500/30 p-3.5 text-xs font-bold tracking-wider text-indigo-200 uppercase hover:bg-indigo-500/40 disabled:opacity-50"
+                        className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-indigo-500/60 bg-indigo-500/30 p-2.5 text-[11px] font-bold tracking-wider text-indigo-200 uppercase hover:bg-indigo-500/40 disabled:opacity-50"
                       >
                         <CloudUpload className="h-4 w-4 text-indigo-400" />
                         {isUploadingToDrive
@@ -346,19 +343,19 @@ La contraseña es un factor adicional, no una llave de apertura.`;
                     <a
                       href={encryptionResult.downloadUrl}
                       download={encryptionResult.pkgFileName}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/50 bg-emerald-500/20 p-3.5 text-center text-xs font-bold tracking-wider text-emerald-300 uppercase hover:bg-emerald-500/30"
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-500/50 bg-emerald-500/20 p-2.5 text-center text-[11px] font-bold tracking-wider text-emerald-300 uppercase hover:bg-emerald-500/30"
                     >
                       <Download className="h-4 w-4" /> Descargar {encryptionResult.pkgFileName}
                     </a>
                     <button
                       onClick={handleNativeShare}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-indigo-500/50 bg-indigo-500/20 p-3.5 text-xs font-bold tracking-wider text-indigo-300 uppercase hover:bg-indigo-500/30"
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-indigo-500/50 bg-indigo-500/20 p-2.5 text-[11px] font-bold tracking-wider text-indigo-300 uppercase hover:bg-indigo-500/30"
                     >
                       <Share2 className="h-4 w-4" /> Compartir paquete
                     </button>
                     <button
                       onClick={copyDistributionInstructions}
-                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 p-3.5 text-xs font-semibold text-white/90 hover:bg-white/10"
+                      className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 p-2.5 text-[11px] font-semibold text-white/90 hover:bg-white/10"
                     >
                       {copiedInstructions ? (
                         <Check className="h-4 w-4 text-emerald-400" />
@@ -397,29 +394,29 @@ La contraseña es un factor adicional, no una llave de apertura.`;
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-6">
-      <div className="glass-panel flex flex-1 flex-col overflow-y-auto p-6">
-                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="flex items-center gap-2 text-xl font-bold text-pink-400">
-            <Lock className="h-5 w-5" /> TDCP · Crear paquete
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="glass-panel flex min-h-0 flex-1 flex-col overflow-y-auto p-3 md:p-4">
+        <div className="mb-2 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="flex items-center gap-2 text-base font-bold text-pink-400">
+            <Lock className="h-4 w-4" /> TDCP · Crear paquete
           </h2>
-          <div className="flex w-fit items-center gap-2 rounded-full border border-pink-500/30 bg-pink-500/10 px-3 py-1 text-[11px] text-pink-300">
-            <ShieldCheck className="h-3.5 w-3.5" /> Gatekeeper-only · v2.5-SEC
+          <div className="flex w-fit items-center gap-1.5 rounded-full border border-pink-500/30 bg-pink-500/10 px-2.5 py-0.5 text-[10px] text-pink-300">
+            <ShieldCheck className="h-3 w-3" /> Gatekeeper-only · v2.5-SEC
           </div>
         </div>
 
-        <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
-          <div className="flex flex-col gap-4">
+        <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
+          <div className="flex flex-col gap-3">
           <CollapsibleSection
             title="1. Origen y factor"
             subtitle="Archivo + contraseña — flujo principal"
             accent="pink"
             defaultOpen
           >
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div>
-                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <label className="flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
+                <div className="mb-1.5 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                  <label className="flex items-center gap-2 text-[11px] font-bold text-white/50 uppercase">
                     Recurso de origen
                   </label>
                   {isSignedIn && (
@@ -449,10 +446,10 @@ La contraseña es un factor adicional, no una llave de apertura.`;
                 )}
               </div>
 
-              <div className="space-y-3 border-t border-white/5 pt-4">
+              <div className="space-y-2 border-t border-white/5 pt-3">
                 <div className="flex items-center justify-between gap-2">
-                  <label className="flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
-                    <KeyRound className="h-4 w-4" /> Factor de contraseña (no autoriza sola)
+                  <label className="flex items-center gap-2 text-[11px] font-bold text-white/50 uppercase">
+                    <KeyRound className="h-3.5 w-3.5" /> Factor de contraseña (no autoriza sola)
                   </label>
                   <span className={`shrink-0 text-[10px] font-bold tracking-wider uppercase ${pwdStrength.color}`}>
                     {pwdStrength.label}
@@ -464,11 +461,11 @@ La contraseña es un factor adicional, no una llave de apertura.`;
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Factor adicional de derivación"
-                    className="min-w-0 flex-1 rounded border border-white/10 bg-white/5 p-3 font-mono text-sm text-white outline-none focus:border-pink-500/50"
+                    className="min-w-0 flex-1 rounded border border-white/10 bg-white/5 p-2.5 font-mono text-sm text-white outline-none focus:border-pink-500/50"
                   />
                   <button
                     onClick={generatePassword}
-                    className="flex shrink-0 items-center justify-center gap-1.5 rounded bg-white/10 px-4 py-3 text-xs font-bold uppercase hover:bg-white/20 sm:py-0"
+                    className="flex shrink-0 items-center justify-center gap-1.5 rounded bg-white/10 px-3 py-2.5 text-[11px] font-bold uppercase hover:bg-white/20 sm:py-0"
                   >
                     <RefreshCw className="h-3.5 w-3.5" /> Auto
                   </button>
@@ -481,32 +478,33 @@ La contraseña es un factor adicional, no una llave de apertura.`;
           <button
             disabled={isEncrypting}
             onClick={processEncrypt}
-            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-pink-500/50 bg-pink-500/20 p-4 font-bold tracking-wider text-pink-400 uppercase shadow-[0_0_20px_rgba(244,114,182,0.1)] hover:bg-pink-500/30 disabled:opacity-50"
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-pink-500/50 bg-pink-500/20 p-3 text-sm font-bold tracking-wider text-pink-400 uppercase shadow-[0_0_20px_rgba(244,114,182,0.1)] hover:bg-pink-500/30 disabled:opacity-50"
           >
-            <Lock className="h-5 w-5" />
+            <Lock className="h-4 w-4" />
             {isEncrypting ? 'Registrando política y sellando...' : 'Crear TDCPPackage y registrar en Oracle'}
           </button>
           </div>
 
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
           <CollapsibleSection
-            title="Política"
+            title="2. Política"
             subtitle="Nivel Oracle · caducidad · EXTRACT"
             accent="amber"
-            defaultOpen={false}
+            defaultOpen
           >
-            <div className="space-y-5">
+            <div className="space-y-3">
               <div>
-                <label className="mb-3 flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
-                  <ShieldAlert className="h-4 w-4" /> Nivel de política (Oracle)
+                <label className="mb-1.5 flex items-center gap-2 text-[11px] font-bold text-white/50 uppercase">
+                  <ShieldAlert className="h-3.5 w-3.5" /> Nivel de política (Oracle)
                 </label>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="grid grid-cols-2 gap-1.5">
                   {(['NORMAL', 'STANDARD', 'CRITICAL', 'ULTRA_CRITICAL'] as PolicyLevel[]).map((level) => (
                     <button
                       key={level}
                       type="button"
                       onClick={() => setPolicyLevel(level)}
-                      className={`rounded-lg border px-3 py-2 text-left text-[11px] font-bold ${
+                      title={POLICY_HELP[level]}
+                      className={`rounded-lg border px-2 py-1.5 text-left text-[10px] font-bold ${
                         policyLevel === level
                           ? 'border-pink-500/60 bg-pink-500/20 text-pink-200'
                           : 'border-white/10 bg-black/30 text-white/60 hover:bg-white/5'
@@ -516,12 +514,12 @@ La contraseña es un factor adicional, no una llave de apertura.`;
                     </button>
                   ))}
                 </div>
-                <p className="mt-2 text-[11px] text-white/50">{POLICY_HELP[policyLevel]}</p>
+                <p className="mt-1.5 text-[10px] text-white/45">{POLICY_HELP[policyLevel]}</p>
               </div>
 
-              <div className="space-y-4 border-t border-white/5 pt-4">
-                <label className="mb-1 flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
-                  <Clock className="h-4 w-4" /> Política de uso
+              <div className="space-y-2.5 border-t border-white/5 pt-3">
+                <label className="mb-0.5 flex items-center gap-2 text-[11px] font-bold text-white/50 uppercase">
+                  <Clock className="h-3.5 w-3.5" /> Política de uso
                 </label>
                 <div>
                   <label className="mb-2 flex cursor-pointer items-center gap-3">
@@ -627,7 +625,7 @@ La contraseña es un factor adicional, no una llave de apertura.`;
         </div>
       </div>
 
-      <div className="glass-card mx-auto h-28 w-full max-w-6xl overflow-y-auto border-l-2 border-l-pink-500 bg-black/40 p-4 font-mono text-xs whitespace-pre-wrap text-white/60">
+      <div className="glass-card h-16 shrink-0 overflow-y-auto border-l-2 border-l-pink-500 bg-black/40 p-2 font-mono text-[10px] leading-snug whitespace-pre-wrap text-white/55">
         {logs}
       </div>
     </div>
