@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Lock,
   Unlock,
@@ -9,6 +9,8 @@ import {
   Check,
   Fingerprint,
   FlaskConical,
+  Menu,
+  X,
 } from 'lucide-react';
 import EncryptPanel from './components/EncryptPanel.tsx';
 import DecryptPanel from './components/DecryptPanel.tsx';
@@ -16,7 +18,7 @@ import MonitorPanel from './components/MonitorPanel.tsx';
 import ValidationPanel from './components/ValidationPanel.tsx';
 import GoogleDriveBar from './components/GoogleDriveBar.tsx';
 import AuthScreen from './components/AuthScreen.tsx';
-import AuthorityStatusBar from './components/AuthorityStatusBar.tsx';
+import AuthorityStatusBar, { AuthorityStatusChip } from './components/AuthorityStatusBar.tsx';
 import CollapsibleSection from './components/CollapsibleSection.tsx';
 import { GoogleAuthProvider } from './lib/googleDriveContext.tsx';
 import { AuthProvider, useAuth } from './lib/authContext.tsx';
@@ -58,11 +60,34 @@ function DcpCrystalIcon({ className = 'w-10 h-10' }: { className?: string }) {
 
 type Tab = 'Decrypt' | 'Encrypt' | 'Monitor' | 'Validate';
 
+const NAV_ITEMS: Array<{
+  name: Tab;
+  label: string;
+  desc: string;
+  icon: typeof Unlock;
+}> = [
+  { name: 'Decrypt', label: 'Gatekeeper', desc: 'Único camino de apertura', icon: Unlock },
+  { name: 'Encrypt', label: 'Crear paquete', desc: 'TDCPPackage + Oracle', icon: Lock },
+  { name: 'Monitor', label: 'Auditoría', desc: 'Tamper-evident local', icon: Activity },
+  { name: 'Validate', label: 'Validación', desc: 'Pruebas reales', icon: FlaskConical },
+];
+
 function MainDCPApp() {
   const { currentUser, isLoading, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('Decrypt');
   const [copiedId, setCopiedId] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const providers = tdcpRuntime.getProviderStatus();
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
 
   if (isLoading) {
     return (
@@ -84,156 +109,203 @@ function MainDCPApp() {
     setTimeout(() => setCopiedId(false), 2000);
   };
 
+  const selectTab = (tab: Tab) => {
+    setActiveTab(tab);
+    setMenuOpen(false);
+  };
+
+  const activeLabel = NAV_ITEMS.find((i) => i.name === activeTab)?.label ?? activeTab;
+
   return (
     <>
       <div className="mesh-bg" />
-      <div className="flex h-dvh w-full gap-4 overflow-hidden p-3 text-white md:gap-6 md:p-6">
-        <aside className="glass-panel hidden w-72 shrink-0 flex-col justify-between p-6 md:flex">
-          <div>
-            <div className="mb-4 flex items-center gap-3.5 border-b border-white/10 pb-4">
-              <DcpCrystalIcon className="h-11 w-11 shrink-0" />
-              <div className="flex min-w-0 flex-col">
-                <span className="bg-gradient-to-r from-pink-300 via-purple-300 to-indigo-300 bg-clip-text text-lg font-black tracking-wider text-transparent">
-                  TDCP SECURE
-                </span>
-                <span className="font-mono text-[9px] tracking-widest text-white/50 uppercase">
-                  Package ≠ authorization
-                </span>
-              </div>
+      <div className="flex h-dvh w-full flex-col overflow-hidden text-white">
+        {/* Compact top bar — logo + Authority chip + Menu */}
+        <header className="glass-panel relative z-40 mx-3 mt-3 flex shrink-0 items-center justify-between gap-3 rounded-2xl px-3 py-2.5 md:mx-6 md:mt-4 md:px-4">
+          <div className="flex min-w-0 items-center gap-2.5 md:gap-3.5">
+            <DcpCrystalIcon className="h-9 w-9 shrink-0 md:h-10 md:w-10" />
+            <div className="flex min-w-0 flex-col">
+              <span className="bg-gradient-to-r from-pink-300 via-purple-300 to-indigo-300 bg-clip-text text-sm font-black tracking-wider text-transparent md:text-base">
+                TDCP SECURE
+              </span>
+              <span className="truncate font-mono text-[9px] tracking-widest text-white/50 uppercase">
+                {activeLabel} · Package ≠ authorization
+              </span>
             </div>
-
-            <div className="mb-4 space-y-2 rounded-xl border border-purple-500/30 bg-black/40 p-3">
-              <div className="flex items-center justify-between">
-                <div className="flex min-w-0 items-center gap-2">
-                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-purple-500/40 bg-purple-500/20 text-xs font-bold text-purple-300">
-                    {currentUser.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="truncate text-xs font-bold text-white">{currentUser.name}</div>
-                    <div className="truncate text-[10px] text-white/40">{currentUser.email}</div>
-                  </div>
-                </div>
-                <button
-                  onClick={logout}
-                  title="Cerrar sesión"
-                  className="shrink-0 cursor-pointer rounded-lg p-1.5 text-white/40 hover:bg-white/10 hover:text-red-400"
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <div className="flex items-center justify-between border-t border-white/5 pt-1.5 text-[10px]">
-                <div className="flex min-w-0 items-center gap-1 truncate font-mono font-bold text-purple-300">
-                  <Fingerprint className="h-3 w-3 shrink-0 text-purple-400" />
-                  <span className="truncate">{currentUser.id}</span>
-                </div>
-                <button
-                  onClick={handleCopyUserId}
-                  className="flex cursor-pointer items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-[9px] text-white/60 hover:bg-white/10"
-                >
-                  {copiedId ? <Check className="h-2.5 w-2.5 text-emerald-400" /> : <Copy className="h-2.5 w-2.5" />}
-                  {copiedId ? 'Copiado' : 'Copiar'}
-                </button>
-              </div>
-            </div>
-
-            <nav className="space-y-2">
-              {(
-                [
-                  { name: 'Decrypt' as const, label: 'Gatekeeper', desc: 'Único camino de apertura', icon: Unlock },
-                  { name: 'Encrypt' as const, label: 'Crear paquete', desc: 'TDCPPackage + Oracle', icon: Lock },
-                  { name: 'Monitor' as const, label: 'Auditoría', desc: 'Tamper-evident local', icon: Activity },
-                  { name: 'Validate' as const, label: 'Validación', desc: 'Pruebas reales', icon: FlaskConical },
-                ]
-              ).map((item) => {
-                const isActive = activeTab === item.name;
-                return (
-                  <button
-                    key={item.name}
-                    type="button"
-                    onClick={() => setActiveTab(item.name)}
-                    className={`flex w-full cursor-pointer items-center gap-3.5 rounded-xl px-4 py-3 text-left transition-all ${
-                      isActive
-                        ? 'active-pill font-semibold text-pink-200 shadow-[0_0_20px_rgba(236,72,153,0.25)]'
-                        : 'text-white/80 opacity-70 hover:bg-white/5 hover:opacity-100'
-                    }`}
-                  >
-                    <div className={`rounded-lg p-2 ${isActive ? 'bg-pink-500/20 text-pink-400' : 'bg-white/5 text-white/60'}`}>
-                      <item.icon className="h-4 w-4" />
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-xs font-bold tracking-wide uppercase">{item.label}</span>
-                      <span className="text-[10px] font-normal text-white/40 normal-case">{item.desc}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </nav>
           </div>
 
-          <div className="space-y-3">
-            <div className="glass-card border border-white/10 bg-black/40 p-4">
-              <div className="mb-2 flex items-center justify-between text-[10px] font-bold tracking-wider text-white/50 uppercase">
-                <span className="flex items-center gap-1.5 text-emerald-400">
-                  <ShieldCheck className="h-3.5 w-3.5" /> Gatekeeper
-                </span>
-                <span className="font-mono text-white/40">v2.5 SEC</span>
-              </div>
-              <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[9px] font-bold leading-snug tracking-wide text-amber-100 uppercase">
-                {providers.authorityKind === 'HTTP_REMOTE'
-                  ? 'MVP — remote Authority (not HSM)'
-                  : providers.modeBadge || 'MVP / Demo — Oracle in-browser'}
-              </div>
-              <div className="space-y-1.5 text-[11px] text-white/60">
-                <div className="flex items-center justify-between">
-                  <span>Control plane</span>
-                  <span className="font-mono font-bold text-amber-300">
-                    {providers.authorityKind === 'HTTP_REMOTE' ? 'REMOTE' : 'IN-PROCESS'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Oracle keys</span>
-                  <span className="font-mono font-bold text-amber-300">DEV ONLY</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>NFC / Device / Bio</span>
-                  <span className="font-mono font-bold text-amber-300">MOCK</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Audit</span>
-                  <span className="font-mono font-bold text-emerald-400">tamper-evident</span>
-                </div>
-              </div>
-              <div className="mt-3 flex items-center gap-2 border-t border-white/10 pt-2">
-                <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
-                <span className="text-[10px] font-medium text-emerald-300/90">
-                  {providers.oracleKeyStore}
-                </span>
-              </div>
-            </div>
-            <p className="text-center text-[10px] tracking-tight text-white/30">
-              The Data Cryptographic Protocol © 2026
-            </p>
-          </div>
-        </aside>
-
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          {/* Mobile: single select — avoids a second horizontal chrome row */}
-          <div className="mb-3 md:hidden">
-            <label htmlFor="tdcp-view-select" className="mb-1 block text-[10px] font-bold tracking-wider text-white/40 uppercase">
-              Vista
-            </label>
-            <select
-              id="tdcp-view-select"
-              value={activeTab}
-              onChange={(e) => setActiveTab(e.target.value as Tab)}
-              className="w-full rounded-xl border border-white/15 bg-black/50 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-pink-500/50"
+          <div className="flex shrink-0 items-center gap-2 md:gap-3">
+            <AuthorityStatusChip className="hidden sm:inline-flex" />
+            <button
+              type="button"
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-expanded={menuOpen}
+              aria-controls="tdcp-nav-drawer"
+              className="flex cursor-pointer items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-xs font-bold tracking-wider text-white uppercase hover:bg-white/10"
             >
-              <option value="Decrypt">Gatekeeper — Único camino de apertura</option>
-              <option value="Encrypt">Crear paquete — TDCPPackage + Oracle</option>
-              <option value="Monitor">Auditoría — Tamper-evident local</option>
-              <option value="Validate">Validación — Pruebas reales</option>
-            </select>
+              {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+              <span className="hidden sm:inline">Menú</span>
+            </button>
           </div>
+        </header>
+
+        {/* Slide-over drawer */}
+        {menuOpen && (
+          <div className="fixed inset-0 z-50 flex justify-end">
+            <button
+              type="button"
+              aria-label="Cerrar menú"
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              onClick={() => setMenuOpen(false)}
+            />
+            <aside
+              id="tdcp-nav-drawer"
+              ref={menuRef}
+              className="glass-panel relative z-10 flex h-full w-full max-w-sm flex-col justify-between overflow-y-auto border-l border-white/10 p-5 shadow-2xl"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menú de navegación TDCP"
+            >
+              <div>
+                <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
+                  <div className="flex items-center gap-3">
+                    <DcpCrystalIcon className="h-9 w-9 shrink-0" />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-black tracking-wider text-white">Menú</span>
+                      <span className="font-mono text-[9px] text-white/40 uppercase">Navegación</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMenuOpen(false)}
+                    className="cursor-pointer rounded-lg p-2 text-white/50 hover:bg-white/10 hover:text-white"
+                    aria-label="Cerrar"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mb-4 space-y-2 rounded-xl border border-purple-500/30 bg-black/40 p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-purple-500/40 bg-purple-500/20 text-xs font-bold text-purple-300">
+                        {currentUser.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-bold text-white">{currentUser.name}</div>
+                        <div className="truncate text-[10px] text-white/40">{currentUser.email}</div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={logout}
+                      title="Cerrar sesión / salir demo"
+                      className="shrink-0 cursor-pointer rounded-lg p-1.5 text-white/40 hover:bg-white/10 hover:text-red-400"
+                    >
+                      <LogOut className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-white/5 pt-1.5 text-[10px]">
+                    <div className="flex min-w-0 items-center gap-1 truncate font-mono font-bold text-purple-300">
+                      <Fingerprint className="h-3 w-3 shrink-0 text-purple-400" />
+                      <span className="truncate">{currentUser.id}</span>
+                    </div>
+                    <button
+                      onClick={handleCopyUserId}
+                      className="flex cursor-pointer items-center gap-1 rounded bg-white/5 px-1.5 py-0.5 text-[9px] text-white/60 hover:bg-white/10"
+                    >
+                      {copiedId ? <Check className="h-2.5 w-2.5 text-emerald-400" /> : <Copy className="h-2.5 w-2.5" />}
+                      {copiedId ? 'Copiado' : 'Copiar'}
+                    </button>
+                  </div>
+                </div>
+
+                <nav className="space-y-2">
+                  {NAV_ITEMS.map((item) => {
+                    const isActive = activeTab === item.name;
+                    return (
+                      <button
+                        key={item.name}
+                        type="button"
+                        onClick={() => selectTab(item.name)}
+                        className={`flex w-full cursor-pointer items-center gap-3.5 rounded-xl px-4 py-3 text-left transition-all ${
+                          isActive
+                            ? 'active-pill font-semibold text-pink-200 shadow-[0_0_20px_rgba(236,72,153,0.25)]'
+                            : 'text-white/80 opacity-70 hover:bg-white/5 hover:opacity-100'
+                        }`}
+                      >
+                        <div
+                          className={`rounded-lg p-2 ${isActive ? 'bg-pink-500/20 text-pink-400' : 'bg-white/5 text-white/60'}`}
+                        >
+                          <item.icon className="h-4 w-4" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold tracking-wide uppercase">{item.label}</span>
+                          <span className="text-[10px] font-normal text-white/40 normal-case">{item.desc}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </nav>
+              </div>
+
+              <div className="mt-6 space-y-3">
+                <div className="sm:hidden">
+                  <AuthorityStatusChip />
+                </div>
+                <div className="glass-card border border-white/10 bg-black/40 p-4">
+                  <div className="mb-2 flex items-center justify-between text-[10px] font-bold tracking-wider text-white/50 uppercase">
+                    <span className="flex items-center gap-1.5 text-emerald-400">
+                      <ShieldCheck className="h-3.5 w-3.5" /> Gatekeeper
+                    </span>
+                    <span className="font-mono text-white/40">v2.5 SEC</span>
+                  </div>
+                  <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[9px] font-bold leading-snug tracking-wide text-amber-100 uppercase">
+                    {providers.authorityKind === 'HTTP_REMOTE'
+                      ? 'MVP — remote Authority (not HSM)'
+                      : providers.modeBadge || 'MVP / Demo — Oracle in-browser'}
+                  </div>
+                  <div className="space-y-1.5 text-[11px] text-white/60">
+                    <div className="flex items-center justify-between">
+                      <span>Control plane</span>
+                      <span className="font-mono font-bold text-amber-300">
+                        {providers.authorityKind === 'HTTP_REMOTE' ? 'REMOTE' : 'IN-PROCESS'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Oracle keys</span>
+                      <span className="font-mono font-bold text-amber-300">DEV ONLY</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>NFC / Device / Bio</span>
+                      <span className="font-mono font-bold text-amber-300">MOCK</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Audit</span>
+                      <span className="font-mono font-bold text-emerald-400">tamper-evident</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 border-t border-white/10 pt-2">
+                    <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                    <span className="text-[10px] font-medium text-emerald-300/90">{providers.oracleKeyStore}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs font-bold tracking-wider text-red-300 uppercase hover:bg-red-500/20"
+                >
+                  <LogOut className="h-3.5 w-3.5" /> Cerrar sesión / salir demo
+                </button>
+                <p className="text-center text-[10px] tracking-tight text-white/30">
+                  The Data Cryptographic Protocol © 2026
+                </p>
+              </div>
+            </aside>
+          </div>
+        )}
+
+        {/* Full-width main content */}
+        <div className="mx-3 mt-3 mb-3 flex min-h-0 flex-1 flex-col overflow-hidden md:mx-6 md:mb-4 md:mt-4">
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <AuthorityStatusBar />
             <div className="mb-3 shrink-0">
@@ -247,7 +319,7 @@ function MainDCPApp() {
               </CollapsibleSection>
             </div>
             <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
-              <div className="mx-auto w-full max-w-3xl pb-4">
+              <div className="mx-auto w-full max-w-6xl pb-4">
                 {activeTab === 'Decrypt' && <DecryptPanel />}
                 {activeTab === 'Encrypt' && <EncryptPanel />}
                 {activeTab === 'Monitor' && <MonitorPanel />}

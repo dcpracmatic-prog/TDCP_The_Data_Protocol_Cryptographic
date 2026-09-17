@@ -269,7 +269,7 @@ La contraseña es un factor adicional, no una llave de apertura.`;
             </p>
           </div>
 
-          <div className="mx-auto mb-8 flex w-full max-w-3xl flex-col gap-4">
+          <div className="mx-auto mb-8 grid w-full max-w-6xl grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
             <div className="flex flex-col space-y-4">
               <div className="glass-card flex-1 border-l-2 border-l-emerald-500 p-6">
                 <h3 className="mb-4 flex items-center gap-2 text-xs font-bold tracking-wider text-white/60 uppercase">
@@ -408,7 +408,8 @@ La contraseña es un factor adicional, no una llave de apertura.`;
           </div>
         </div>
 
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+        <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
+          <div className="flex flex-col gap-4">
           <CollapsibleSection
             title="1. Origen y factor"
             subtitle="Archivo + contraseña — flujo principal"
@@ -477,6 +478,17 @@ La contraseña es un factor adicional, no una llave de apertura.`;
             </div>
           </CollapsibleSection>
 
+          <button
+            disabled={isEncrypting}
+            onClick={processEncrypt}
+            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-pink-500/50 bg-pink-500/20 p-4 font-bold tracking-wider text-pink-400 uppercase shadow-[0_0_20px_rgba(244,114,182,0.1)] hover:bg-pink-500/30 disabled:opacity-50"
+          >
+            <Lock className="h-5 w-5" />
+            {isEncrypting ? 'Registrando política y sellando...' : 'Crear TDCPPackage y registrar en Oracle'}
+          </button>
+          </div>
+
+          <div className="flex flex-col gap-4">
           <CollapsibleSection
             title="Política"
             subtitle="Nivel Oracle · caducidad · EXTRACT"
@@ -611,18 +623,11 @@ La contraseña es un factor adicional, no una llave de apertura.`;
             </div>
           </CollapsibleSection>
 
-          <button
-            disabled={isEncrypting}
-            onClick={processEncrypt}
-            className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-pink-500/50 bg-pink-500/20 p-4 font-bold tracking-wider text-pink-400 uppercase shadow-[0_0_20px_rgba(244,114,182,0.1)] hover:bg-pink-500/30 disabled:opacity-50"
-          >
-            <Lock className="h-5 w-5" />
-            {isEncrypting ? 'Registrando política y sellando...' : 'Crear TDCPPackage y registrar en Oracle'}
-          </button>
+          </div>
         </div>
       </div>
 
-      <div className="glass-card h-28 overflow-y-auto border-l-2 border-l-pink-500 bg-black/40 p-4 font-mono text-xs whitespace-pre-wrap text-white/60">
+      <div className="glass-card mx-auto h-28 w-full max-w-6xl overflow-y-auto border-l-2 border-l-pink-500 bg-black/40 p-4 font-mono text-xs whitespace-pre-wrap text-white/60">
         {logs}
       </div>
     </div>
