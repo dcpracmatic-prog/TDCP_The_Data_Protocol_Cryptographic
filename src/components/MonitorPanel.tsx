@@ -142,7 +142,7 @@ export default function MonitorPanel() {
           </span>
         </div>
 
-        <div className="mb-4 flex shrink-0 flex-col gap-3">
+        <div className="mb-4 grid shrink-0 grid-cols-1 gap-3 md:grid-cols-2">
           <CollapsibleSection
             title="Ops Authority"
             subtitle="Salud remota · métricas"
@@ -314,73 +314,83 @@ export default function MonitorPanel() {
 
         {activeTab === 'killswitch' && (
           <div className="flex-1 overflow-y-auto">
-            <div className="mx-auto w-full max-w-2xl space-y-6 py-2">
-              <div className="mb-6 text-center">
-                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-pink-500/50 bg-pink-500/20">
+            <div className="mx-auto w-full max-w-6xl space-y-6 py-2">
+              <div className="mb-2 text-center md:text-left">
+                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-pink-500/50 bg-pink-500/20 md:mx-0">
                   <ShieldAlert className="h-7 w-7 text-pink-400" />
                 </div>
                 <h3 className="mb-1.5 text-lg font-bold text-white">Revocación por epoch</h3>
-                <p className="mx-auto max-w-md text-xs leading-relaxed text-white/60">
+                <p className="mx-auto max-w-md text-xs leading-relaxed text-white/60 md:mx-0">
                   El Oracle incrementa authorizationEpoch e isRevoked=true. localStorage no es autoridad.
                 </p>
               </div>
-              <div className="glass-card space-y-4 border-l-2 border-l-pink-500 p-6">
-                <label className="mb-2 block text-xs font-bold text-white/50 uppercase">
-                  MONITOR-DOC-... (documentId)
-                </label>
-                <input
-                  type="text"
-                  value={monitorKey}
-                  onChange={(e) => setMonitorKey(e.target.value)}
-                  placeholder="MONITOR-DOC-..."
-                  className="w-full rounded-lg border border-white/10 bg-black/40 p-3.5 font-mono text-sm text-pink-300 outline-none"
-                />
-                <button
-                  onClick={handleKillSwitch}
-                  className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-pink-500/50 bg-pink-500/20 p-4 font-bold tracking-wider text-pink-300 uppercase"
-                >
-                  <Ban className="h-5 w-5" /> Revocar (epoch++)
-                </button>
-              </div>
-              {status && (
-                <div
-                  className={`flex items-start gap-3 rounded-lg border p-4 ${
-                    status.type === 'success'
-                      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                      : 'border-red-500/30 bg-red-500/10 text-red-400'
-                  }`}
-                >
-                  {status.type === 'success' ? (
-                    <CheckCircle className="mt-0.5 h-5 w-5 shrink-0" />
-                  ) : (
-                    <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
-                  )}
-                  <p className="text-xs leading-relaxed">{status.message}</p>
-                </div>
-              )}
-              {revoked.length > 0 && (
-                <div className="glass-card space-y-3 border border-white/10 p-5">
-                  {revoked.map((item) => (
-                    <div
-                      key={item.documentId}
-                      className="flex items-center justify-between rounded border border-white/5 bg-black/30 p-2.5 text-xs"
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
+                <div className="space-y-4">
+                  <div className="glass-card space-y-4 border-l-2 border-l-pink-500 p-6">
+                    <label className="mb-2 block text-xs font-bold text-white/50 uppercase">
+                      MONITOR-DOC-... (documentId)
+                    </label>
+                    <input
+                      type="text"
+                      value={monitorKey}
+                      onChange={(e) => setMonitorKey(e.target.value)}
+                      placeholder="MONITOR-DOC-..."
+                      className="w-full rounded-lg border border-white/10 bg-black/40 p-3.5 font-mono text-sm text-pink-300 outline-none"
+                    />
+                    <button
+                      onClick={handleKillSwitch}
+                      className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-pink-500/50 bg-pink-500/20 p-4 font-bold tracking-wider text-pink-300 uppercase"
                     >
-                      <div>
-                        <div className="font-mono font-bold text-pink-300">{item.documentId}</div>
-                        <div className="text-[10px] text-white/40">
-                          epoch {item.currentEpoch} · {item.revocationReason}
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => restore(item.documentId)}
-                        className="cursor-pointer rounded border border-white/10 px-2 py-1 text-[11px] text-white/70 hover:text-white"
-                      >
-                        Restaurar (epoch++)
-                      </button>
+                      <Ban className="h-5 w-5" /> Revocar (epoch++)
+                    </button>
+                  </div>
+                  {status && (
+                    <div
+                      className={`flex items-start gap-3 rounded-lg border p-4 ${
+                        status.type === 'success'
+                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                          : 'border-red-500/30 bg-red-500/10 text-red-400'
+                      }`}
+                    >
+                      {status.type === 'success' ? (
+                        <CheckCircle className="mt-0.5 h-5 w-5 shrink-0" />
+                      ) : (
+                        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                      )}
+                      <p className="text-xs leading-relaxed">{status.message}</p>
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
+                <div className="space-y-3">
+                  {revoked.length > 0 ? (
+                    <div className="glass-card space-y-3 border border-white/10 p-5">
+                      {revoked.map((item) => (
+                        <div
+                          key={item.documentId}
+                          className="flex items-center justify-between rounded border border-white/5 bg-black/30 p-2.5 text-xs"
+                        >
+                          <div>
+                            <div className="font-mono font-bold text-pink-300">{item.documentId}</div>
+                            <div className="text-[10px] text-white/40">
+                              epoch {item.currentEpoch} · {item.revocationReason}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => restore(item.documentId)}
+                            className="cursor-pointer rounded border border-white/10 px-2 py-1 text-[11px] text-white/70 hover:text-white"
+                          >
+                            Restaurar (epoch++)
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="glass-card flex h-full min-h-32 items-center justify-center border border-dashed border-white/10 p-5 text-center text-xs text-white/40">
+                      Sin documentos revocados en esta sesión.
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}

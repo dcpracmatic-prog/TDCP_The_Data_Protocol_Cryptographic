@@ -244,7 +244,8 @@ export default function DecryptPanel() {
         </div>
 
         {!result ? (
-          <div className="mx-auto mt-2 flex w-full max-w-3xl flex-col gap-4">
+          <div className="mx-auto mt-2 grid w-full max-w-6xl grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
+            <div className="flex flex-col gap-4">
             <CollapsibleSection
               title="1. Apertura"
               subtitle="Paquete · operación · factores · unlock"
@@ -383,7 +384,9 @@ export default function DecryptPanel() {
                 </button>
               </div>
             </CollapsibleSection>
+            </div>
 
+            <div className="flex flex-col gap-4">
             <CollapsibleSection
               title="Camino real"
               subtitle="Flujo de autorización · formatos"
@@ -414,6 +417,7 @@ export default function DecryptPanel() {
                 EXTRACT sólo si el Oracle emitió un grant con allowExtraction.
               </div>
             </CollapsibleSection>
+            </div>
           </div>
         ) : (
           <div className="relative flex h-full flex-col overflow-hidden rounded-xl border border-indigo-500/30 bg-black/50">
@@ -537,7 +541,7 @@ export default function DecryptPanel() {
         )}
       </div>
 
-      <div className="glass-card h-28 overflow-y-auto border-l-2 border-l-indigo-500 bg-black/40 p-4 font-mono text-[11px] whitespace-pre-wrap text-white/60">
+      <div className="glass-card mx-auto h-28 w-full max-w-6xl overflow-y-auto border-l-2 border-l-indigo-500 bg-black/40 p-4 font-mono text-[11px] whitespace-pre-wrap text-white/60">
         {logs}
       </div>
     </div>

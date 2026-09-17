@@ -77,6 +77,47 @@ export function useAuthorityHealth(pollMs = 5000): AuthorityHealthSnapshot {
   return snap;
 }
 
+
+/** Compact chip for the app top bar (hamburger shell). */
+export function AuthorityStatusChip({ className = '' }: { className?: string }) {
+  const health = useAuthorityHealth();
+
+  if (health.state === 'connected') {
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-emerald-200 uppercase ${className}`}
+      >
+        <Wifi className="h-3 w-3" /> Authority Connected
+      </span>
+    );
+  }
+  if (health.state === 'offline') {
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-500/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-red-200 uppercase ${className}`}
+      >
+        <WifiOff className="h-3 w-3" /> Authority Offline
+      </span>
+    );
+  }
+  if (health.state === 'checking') {
+    return (
+      <span
+        className={`inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-amber-100 uppercase ${className}`}
+      >
+        <Activity className="h-3 w-3 animate-pulse" /> Checking…
+      </span>
+    );
+  }
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-amber-100 uppercase ${className}`}
+    >
+      In-process Oracle
+    </span>
+  );
+}
+
 /** Always-visible MVP / Authority honesty banner + connection chip. */
 export function AuthorityStatusBar() {
   const health = useAuthorityHealth();
@@ -95,25 +136,6 @@ export function AuthorityStatusBar() {
       'MVP / Demo — Oracle in-process (sin TDCP_AUTHORITY_URL). No es frontera de producción.';
   }
 
-  const chip =
-    health.state === 'connected' ? (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-emerald-200 uppercase">
-        <Wifi className="h-3 w-3" /> Authority Connected
-      </span>
-    ) : health.state === 'offline' ? (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/40 bg-red-500/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-red-200 uppercase">
-        <WifiOff className="h-3 w-3" /> Authority Offline
-      </span>
-    ) : health.state === 'checking' ? (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-amber-100 uppercase">
-        <Activity className="h-3 w-3 animate-pulse" /> Checking…
-      </span>
-    ) : (
-      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-bold tracking-wide text-amber-100 uppercase">
-        In-process Oracle
-      </span>
-    );
-
   return (
     <div className="mb-3 flex flex-col gap-2 rounded-xl border border-white/10 bg-black/50 px-3 py-2.5 md:flex-row md:items-center md:justify-between">
       <div className="min-w-0 space-y-1">
@@ -123,7 +145,9 @@ export function AuthorityStatusBar() {
           use it.
         </p>
       </div>
-      <div className="shrink-0">{chip}</div>
+      <div className="shrink-0">
+        <AuthorityStatusChip />
+      </div>
     </div>
   );
 }
