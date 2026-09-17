@@ -50,7 +50,11 @@ Do not describe the current browser Oracle as a remote sovereign authority, TPM,
 - ECDSA P-256 for Oracle authorization grants.
 - Cryptographically secure random nonces/identifiers from Web Crypto.
 
-## ULTRA_CRITICAL
+## **NOTA** 
+
+``
+ULTRA_CRITICAL
+``
 
 A/B/C provides cross-bound fragment integrity and controlled reconstruction. It is not a threshold-secret-sharing scheme. A/B/C must not be described as equivalent to Shamir Secret Sharing.
 
