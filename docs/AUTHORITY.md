@@ -80,24 +80,28 @@ Gatekeeper accepts optional `authority`; existing `oracle` option remains for ba
 ## What is still required for production
 
 - Real HSM/KMS-backed signing (no extractable JWK on disk)
-- Authenticated admin/issuer API (mTLS / OAuth) for register/revoke
+- Broader IdP product features (SSO UI, multi-tenant RBAC) beyond admin JWT/mTLS hardening — see `docs/ADMIN_AUTH.md`
 - Independent security review
 - Multi-tenant isolation, backups, monitoring, SLOs
 - Formal threat model update in `AUDIT_2.5.1.md`
 
 ## Admin authentication
 
-Admin endpoints require `Authorization: Bearer <TDCP_AUTHORITY_ADMIN_TOKEN>`:
+Admin endpoints (register / revoke / restore / admin lists) support stronger modes via `TDCP_AUTHORITY_ADMIN_AUTH`:
 
-- `POST /v1/documents/register`
-- `GET /v1/documents`
-- `POST /v1/revoke`
-- `POST /v1/restore`
-- `GET /v1/revoked`
+| Mode | Summary |
+|------|---------|
+| `token` (default) | Bearer `TDCP_AUTHORITY_ADMIN_TOKEN` — **local/dev fallback** |
+| `oidc` | OAuth2/OIDC JWT + admin claim — preferred for hosted |
+| `mtls` | Client certificate against CA — preferred for self-host / high assurance |
+| `oidc+mtls` | Both JWT and client cert required |
 
-If the env token is unset, admin routes return **503** `ADMIN_TOKEN_NOT_CONFIGURED`. Wrong/missing Bearer → **401** `UNAUTHORIZED`.
+Full configuration, error codes, and mTLS cert generation: **`docs/ADMIN_AUTH.md`**.
+
+Token-mode quick start:
 
 ```bash
+export TDCP_AUTHORITY_ADMIN_AUTH=token   # default
 export TDCP_AUTHORITY_ADMIN_TOKEN="$(openssl rand -hex 32)"
 curl -s -X POST "$TDCP_AUTHORITY_URL/v1/documents/register" \
   -H "authorization: Bearer $TDCP_AUTHORITY_ADMIN_TOKEN" \
@@ -105,9 +109,11 @@ curl -s -X POST "$TDCP_AUTHORITY_URL/v1/documents/register" \
   -d '{"documentId":"DOC-1","packageId":"PKG-1","policyLevel":"STANDARD","allowExtraction":false,"createdAt":0}'
 ```
 
-Issuer / Node tooling may set `TDCP_AUTHORITY_ADMIN_TOKEN` for `HttpAuthorityClient`. `VITE_TDCP_AUTHORITY_ADMIN_TOKEN` is **local demo only** (leaks into the browser bundle).
+When mode is `oidc|mtls|oidc+mtls`, the static Bearer token is **disabled**. Issuer tooling may still use `TDCP_AUTHORITY_ADMIN_TOKEN` with `HttpAuthorityClient` for local token mode only. `VITE_TDCP_AUTHORITY_ADMIN_TOKEN` is **local demo only** (leaks into the browser bundle).
 
 Gatekeeper public path (challenge / authorize / wrap-secret release / public-key / per-document policy get) stays unauthenticated, with in-memory rate limits on challenge/authorize.
+
+**Honesty:** this hardens the admin surface; it is not a full enterprise IdP.
 
 ## Ops endpoints
 

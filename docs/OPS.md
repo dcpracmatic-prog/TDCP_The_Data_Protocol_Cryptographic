@@ -72,17 +72,22 @@ Publish customer-facing SLOs only after ops ownership is assigned.
 
 Wire Prometheus scrape to `/metrics` or equivalent.
 
-## Admin token
+## Admin authentication
+
+Default (local): Bearer token.
 
 ```bash
+export TDCP_AUTHORITY_ADMIN_AUTH=token   # default
 export TDCP_AUTHORITY_ADMIN_TOKEN="$(openssl rand -hex 32)"
-# Clients / issuer tooling:
 # Authorization: Bearer $TDCP_AUTHORITY_ADMIN_TOKEN
 ```
 
-Required for: `POST /v1/documents/register`, `POST /v1/revoke`, `POST /v1/restore`, `GET /v1/documents`, `GET /v1/revoked`.
+Production-hardening options (hosted OIDC JWT and/or mTLS client certs): see **`docs/ADMIN_AUTH.md`**.
 
-Gatekeeper public path (challenge / authorize / wrap-secret release) does **not** use this token.
+- `TDCP_AUTHORITY_ADMIN_AUTH=oidc|mtls|oidc+mtls` disables the static Bearer token
+- Admin routes: `POST /v1/documents/register`, `POST /v1/revoke`, `POST /v1/restore`, `GET /v1/documents`, `GET /v1/revoked`
+- Gatekeeper public path (challenge / authorize / wrap-secret release) does **not** use admin auth
+- Alert on `admin_unauthorized` covers token, OIDC, and mTLS failures
 
 ## Signing backend
 
