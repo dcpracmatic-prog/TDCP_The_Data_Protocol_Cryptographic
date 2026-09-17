@@ -1,7 +1,42 @@
 # TDCP Web — Reference Implementation 2.5
 
-TDCP (The Data Cryptographic Protocol) is the protocol layer used by this application to separate encrypted data from authorization to operate on that data.
+TDCP (The Data Cryptographic Protocol) separates encrypted packages from authorization to operate on them.
 
+> **Copying the file does not copy the right to use it.** / **Copiar el archivo no copia el derecho a usarlo.**
+
+## MVP Quickstart (operational)
+
+**One command** — Authority + Web with demo entry:
+
+```bash
+./scripts/start-mvp.sh
+```
+
+Printed URLs (defaults):
+
+| Service | URL |
+|---------|-----|
+| Authority | http://127.0.0.1:8787/ |
+| Web UI | http://127.0.0.1:8080/ |
+
+**What you see**
+
+1. Open the Web URL.
+2. Click **Continuar en modo demo (MVP)** (no Firebase / Gemini).
+3. Use Encrypt / Decrypt / Monitor. Banner shows MVP status + Authority Connected/Offline.
+4. Stop with `Ctrl+C` or `./scripts/stop-mvp.sh`.
+
+**Smoke** (Authority must be up):
+
+```bash
+npm run smoke:mvp
+```
+
+**ES (corto):** `./scripts/start-mvp.sh` → abre la Web → **Continuar en modo demo (MVP)** → Encrypt / Decrypt / Monitor. Authority en `:8787`. No es HSM ni IRM SaaS completo.
+
+Details: [`MVP.md`](./MVP.md) · Authority: [`docs/AUTHORITY.md`](./docs/AUTHORITY.md) · Ops: [`docs/OPS.md`](./docs/OPS.md)
+
+---
 
 ## Production launch foundation
 

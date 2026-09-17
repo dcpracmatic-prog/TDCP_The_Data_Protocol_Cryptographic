@@ -16,6 +16,7 @@ import MonitorPanel from './components/MonitorPanel.tsx';
 import ValidationPanel from './components/ValidationPanel.tsx';
 import GoogleDriveBar from './components/GoogleDriveBar.tsx';
 import AuthScreen from './components/AuthScreen.tsx';
+import AuthorityStatusBar from './components/AuthorityStatusBar.tsx';
 import { GoogleAuthProvider } from './lib/googleDriveContext.tsx';
 import { AuthProvider, useAuth } from './lib/authContext.tsx';
 import { tdcpRuntime } from './runtime/tdcp-runtime.ts';
@@ -95,7 +96,7 @@ function MainDCPApp() {
                   TDCP SECURE
                 </span>
                 <span className="font-mono text-[9px] tracking-widest text-white/50 uppercase">
-                  The Data Cryptographic Protocol
+                  Package ≠ authorization
                 </span>
               </div>
             </div>
@@ -177,7 +178,9 @@ function MainDCPApp() {
                 <span className="font-mono text-white/40">v2.5 SEC</span>
               </div>
               <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[9px] font-bold leading-snug tracking-wide text-amber-100 uppercase">
-                {providers.modeBadge || 'Reference / Demo — Oracle in-browser'}
+                {providers.authorityKind === 'HTTP_REMOTE'
+                  ? 'MVP — remote Authority (not HSM)'
+                  : providers.modeBadge || 'MVP / Demo — Oracle in-browser'}
               </div>
               <div className="space-y-1.5 text-[11px] text-white/60">
                 <div className="flex items-center justify-between">
@@ -235,6 +238,7 @@ function MainDCPApp() {
             ))}
           </div>
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <AuthorityStatusBar />
             <GoogleDriveBar />
             <div className="min-h-0 flex-1 overflow-hidden">
               {activeTab === 'Decrypt' && <DecryptPanel />}

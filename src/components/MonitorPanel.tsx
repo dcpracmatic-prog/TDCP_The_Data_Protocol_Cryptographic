@@ -17,6 +17,7 @@ import {
 import { tdcpRuntime, TDCP_AUDIT_UPDATED_EVENT } from '../runtime/tdcp-runtime.ts';
 import type { AuditEvent } from '../audit/audit-event.ts';
 import type { DocumentRevocationState } from '../core/authorization/types.ts';
+import AuthorityOpsStrip from './AuthorityOpsStrip.tsx';
 
 export default function MonitorPanel() {
   const [activeTab, setActiveTab] = useState<'audit' | 'killswitch'>('audit');
@@ -139,6 +140,8 @@ export default function MonitorPanel() {
             <Lock className="h-3.5 w-3.5" /> no localStorage de seguridad
           </span>
         </div>
+
+        <AuthorityOpsStrip />
 
         <div className="mb-5 grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-xl border border-white/10 bg-black/30 p-3">

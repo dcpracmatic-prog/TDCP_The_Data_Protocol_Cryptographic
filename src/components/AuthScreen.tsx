@@ -57,7 +57,7 @@ const SECURITY_QUESTIONS = [
 ];
 
 export default function AuthScreen() {
-  const { login, register, recoverPassword, generateCustomUserId } = useAuth();
+  const { login, register, recoverPassword, generateCustomUserId, enterDemoSession } = useAuth();
   const [mode, setMode] = useState<'login' | 'register' | 'recover'>('login');
 
   // Form States
@@ -241,14 +241,13 @@ export default function AuthScreen() {
             <ShieldCheck className="w-3 h-3 text-purple-400" /> Autenticación Obligatoria de Acceso
           </div>
           <div className="mt-2 max-w-sm space-y-1.5 text-center">
-            <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-0.5 text-[10px] font-bold tracking-wide text-amber-200 uppercase">
-              Reference / Demo — Oracle in-browser
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-0.5 text-[10px] font-bold tracking-wide text-emerald-200 uppercase">
+              MVP operativo — demo entry
             </div>
             <p className="text-[10px] leading-relaxed text-white/45">
-              Local account shell only (not a production IdP). Create an account under{' '}
-              <span className="font-semibold text-white/70">Crear Cuenta</span> to reach Encrypt/Decrypt.
-              Crypto is never bypassed. Production path: set{' '}
-              <span className="font-mono text-emerald-300/90">TDCP_AUTHORITY_URL</span>.
+              Use <span className="font-semibold text-white/70">Continuar en modo demo (MVP)</span> to reach
+              Encrypt / Decrypt / Monitor without Firebase. Local account shell still available.
+              Crypto and Gatekeeper are never bypassed.
             </p>
           </div>
         </div>
@@ -304,6 +303,25 @@ export default function AuthScreen() {
             <span>{successMsg}</span>
           </div>
         )}
+
+        {/* MVP demo gate — local session only */}
+        <div className="mb-5 space-y-2">
+          <button
+            type="button"
+            disabled={isSubmitting}
+            onClick={() => {
+              setErrorMsg(null);
+              enterDemoSession();
+            }}
+            className="w-full cursor-pointer rounded-xl border border-emerald-500/50 bg-gradient-to-r from-emerald-600/30 via-teal-600/25 to-cyan-600/30 px-4 py-3 text-xs font-black uppercase tracking-wider text-emerald-100 shadow-[0_0_24px_rgba(16,185,129,0.25)] transition-all hover:from-emerald-600/50 hover:to-cyan-600/50 disabled:opacity-50"
+          >
+            Continuar en modo demo (MVP)
+          </button>
+          <p className="text-center text-[9px] leading-relaxed text-white/40">
+            EN: Enter product panels with a local demo session · ES: Entra a Encrypt/Decrypt/Monitor sin IdP externo.
+            Does not weaken crypto.
+          </p>
+        </div>
 
         {/* 1. FORMULARIO DE INICIO DE SESIÓN */}
         {mode === 'login' && (

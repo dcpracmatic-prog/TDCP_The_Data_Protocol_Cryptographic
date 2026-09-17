@@ -22,7 +22,10 @@
     "test:scripts": "node --test 'scripts/**/*.test.mjs'",
     "test:all": "npm run test:scripts && npm test",
     "authority": "node --experimental-strip-types server/authority/index.ts",
-    "start:prod-stack": "bash scripts/start-prod-stack.sh"
+    "start:prod-stack": "bash scripts/start-prod-stack.sh",
+    "start:mvp": "bash scripts/start-mvp.sh",
+    "stop:mvp": "bash scripts/stop-mvp.sh",
+    "smoke:mvp": "node scripts/smoke-mvp.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",

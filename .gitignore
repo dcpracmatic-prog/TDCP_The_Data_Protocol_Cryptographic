@@ -52,3 +52,5 @@ attachments/
 .vercel/
 # Dev mTLS certs from scripts/gen-dev-mtls.sh (never commit)
 data/mtls-dev/
+# Local MVP runtime (pids, logs, local admin token)
+.mvp/
