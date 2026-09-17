@@ -79,3 +79,12 @@ body {
     visibility: hidden !important;
   }
 }
+
+
+/* Collapsible sections: calm vertical chrome */
+details.glass-card > summary {
+  list-style: none;
+}
+details.glass-card > summary::-webkit-details-marker {
+  display: none;
+}

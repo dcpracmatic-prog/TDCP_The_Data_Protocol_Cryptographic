@@ -17,6 +17,7 @@ import ValidationPanel from './components/ValidationPanel.tsx';
 import GoogleDriveBar from './components/GoogleDriveBar.tsx';
 import AuthScreen from './components/AuthScreen.tsx';
 import AuthorityStatusBar from './components/AuthorityStatusBar.tsx';
+import CollapsibleSection from './components/CollapsibleSection.tsx';
 import { GoogleAuthProvider } from './lib/googleDriveContext.tsx';
 import { AuthProvider, useAuth } from './lib/authContext.tsx';
 import { tdcpRuntime } from './runtime/tdcp-runtime.ts';
@@ -216,35 +217,42 @@ function MainDCPApp() {
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <div className="mb-3 flex gap-2 overflow-x-auto md:hidden">
-            {(
-              [
-                ['Decrypt', 'Abrir'],
-                ['Encrypt', 'Crear'],
-                ['Monitor', 'Audit'],
-                ['Validate', 'Tests'],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setActiveTab(id)}
-                className={`shrink-0 rounded-full px-3 py-2 text-xs font-bold ${
-                  activeTab === id ? 'bg-pink-500/20 text-pink-200' : 'bg-white/5 text-white/60'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          {/* Mobile: single select — avoids a second horizontal chrome row */}
+          <div className="mb-3 md:hidden">
+            <label htmlFor="tdcp-view-select" className="mb-1 block text-[10px] font-bold tracking-wider text-white/40 uppercase">
+              Vista
+            </label>
+            <select
+              id="tdcp-view-select"
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value as Tab)}
+              className="w-full rounded-xl border border-white/15 bg-black/50 px-3 py-2.5 text-sm font-bold text-white outline-none focus:border-pink-500/50"
+            >
+              <option value="Decrypt">Gatekeeper — Único camino de apertura</option>
+              <option value="Encrypt">Crear paquete — TDCPPackage + Oracle</option>
+              <option value="Monitor">Auditoría — Tamper-evident local</option>
+              <option value="Validate">Validación — Pruebas reales</option>
+            </select>
           </div>
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <AuthorityStatusBar />
-            <GoogleDriveBar />
-            <div className="min-h-0 flex-1 overflow-hidden">
-              {activeTab === 'Decrypt' && <DecryptPanel />}
-              {activeTab === 'Encrypt' && <EncryptPanel />}
-              {activeTab === 'Monitor' && <MonitorPanel />}
-              {activeTab === 'Validate' && <ValidationPanel />}
+            <div className="mb-3 shrink-0">
+              <CollapsibleSection
+                title="Almacenamiento"
+                subtitle="Google Drive · carpetas compartidas"
+                accent="indigo"
+                defaultOpen={false}
+              >
+                <GoogleDriveBar />
+              </CollapsibleSection>
+            </div>
+            <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
+              <div className="mx-auto w-full max-w-3xl pb-4">
+                {activeTab === 'Decrypt' && <DecryptPanel />}
+                {activeTab === 'Encrypt' && <EncryptPanel />}
+                {activeTab === 'Monitor' && <MonitorPanel />}
+                {activeTab === 'Validate' && <ValidationPanel />}
+              </div>
             </div>
           </main>
         </div>

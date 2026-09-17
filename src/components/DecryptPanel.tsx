@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useGoogleAuth } from '../lib/googleDriveContext.tsx';
 import DriveFolderBrowser from './DriveFolderBrowser.tsx';
+import CollapsibleSection from './CollapsibleSection.tsx';
 import { tdcpRuntime } from '../runtime/tdcp-runtime.ts';
 import type { TDCPPackage } from '../core/package/package-format.ts';
 import type { TDCPRequestedOperation } from '../core/authorization/types.ts';
@@ -233,153 +234,162 @@ export default function DecryptPanel() {
   return (
     <div className="flex h-full min-h-0 select-none flex-col gap-6" onContextMenu={(e) => e.preventDefault()}>
       <div className="glass-panel relative flex flex-1 flex-col overflow-y-auto p-6">
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="flex items-center gap-2 text-xl font-bold text-indigo-400">
             <Unlock className="h-5 w-5" /> TDCP · Gatekeeper
           </h2>
-          <div className="flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-[11px] text-indigo-300">
+          <div className="flex w-fit items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-[11px] text-indigo-300">
             <ShieldCheck className="h-3.5 w-3.5" /> Sin bypass de contraseña
           </div>
         </div>
 
         {!result ? (
-          <div className="mx-auto mt-2 grid w-full max-w-2xl grid-cols-1 gap-6">
-            <div className="glass-card space-y-5 border-l-2 border-l-indigo-500 p-6">
-              <div>
-                <div className="mb-2 flex items-center justify-between">
-                  <label className="text-xs font-bold text-white/50 uppercase">1. TDCPPackage (.pkg)</label>
-                  {isSignedIn && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          openFilePicker((fileBlob, fileName) => {
-                            void loadPackage(new File([fileBlob], fileName, { type: 'application/octet-stream' }));
-                          });
+          <div className="mx-auto mt-2 flex w-full max-w-3xl flex-col gap-4">
+            <CollapsibleSection
+              title="1. Apertura"
+              subtitle="Paquete · operación · factores · unlock"
+              accent="indigo"
+              defaultOpen
+            >
+              <div className="space-y-5">
+                <div>
+                  <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <label className="text-xs font-bold text-white/50 uppercase">TDCPPackage (.pkg)</label>
+                    {isSignedIn && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            openFilePicker((fileBlob, fileName) => {
+                              void loadPackage(new File([fileBlob], fileName, { type: 'application/octet-stream' }));
+                            });
+                          }}
+                          className="flex cursor-pointer items-center gap-1 rounded border border-indigo-500/40 bg-indigo-500/20 px-2.5 py-1 text-[11px] text-indigo-300"
+                        >
+                          <HardDrive className="h-3 w-3" /> Drive
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowDriveBrowser(!showDriveBrowser)}
+                          className="flex cursor-pointer items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/20 px-2.5 py-1 text-[11px] text-emerald-300"
+                        >
+                          <FolderOpen className="h-3 w-3" /> Carpeta
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {showDriveBrowser && (
+                    <div className="mb-4">
+                      <DriveFolderBrowser
+                        onSelectDriveFileForDecrypt={(fileBlob, fileName) => {
+                          void loadPackage(new File([fileBlob], fileName, { type: 'application/octet-stream' }));
+                          setShowDriveBrowser(false);
                         }}
-                        className="flex cursor-pointer items-center gap-1 rounded border border-indigo-500/40 bg-indigo-500/20 px-2.5 py-1 text-[11px] text-indigo-300"
-                      >
-                        <HardDrive className="h-3 w-3" /> Drive
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowDriveBrowser(!showDriveBrowser)}
-                        className="flex cursor-pointer items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/20 px-2.5 py-1 text-[11px] text-emerald-300"
-                      >
-                        <FolderOpen className="h-3 w-3" /> Carpeta
-                      </button>
+                      />
                     </div>
                   )}
+                  <input
+                    type="file"
+                    accept=".pkg,application/octet-stream"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) void loadPackage(f);
+                    }}
+                    className="w-full cursor-pointer text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-500/20 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-400"
+                  />
+                  {file && pkg && (
+                    <div className="mt-2 break-all rounded border border-white/5 bg-black/30 p-2 font-mono text-xs text-indigo-300/80">
+                      {file.name} · {pkg.metadata.policyLevel} · {pkg.documentId}
+                    </div>
+                  )}
+                  {parseError && <p className="mt-2 text-xs text-rose-400">{parseError}</p>}
                 </div>
-                {showDriveBrowser && (
-                  <div className="mb-4">
-                    <DriveFolderBrowser
-                      onSelectDriveFileForDecrypt={(fileBlob, fileName) => {
-                        void loadPackage(new File([fileBlob], fileName, { type: 'application/octet-stream' }));
-                        setShowDriveBrowser(false);
-                      }}
-                    />
+
+                <div>
+                  <label className="mb-2 block text-xs font-bold text-white/50 uppercase">Operación solicitada</label>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {(['READ', 'RENDER_RAM', 'EXTRACT', 'AUDIT_EXPORT'] as TDCPRequestedOperation[]).map((op) => (
+                      <button
+                        key={op}
+                        type="button"
+                        onClick={() => setOperation(op)}
+                        className={`rounded-lg border px-2 py-2 text-[10px] font-bold ${
+                          operation === op
+                            ? 'border-indigo-500/60 bg-indigo-500/20 text-indigo-200'
+                            : 'border-white/10 bg-black/30 text-white/50'
+                        }`}
+                      >
+                        {op}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={tapCredential}
+                    className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-xs font-bold ${
+                      credentialReady
+                        ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+                        : 'border-white/10 bg-white/5 text-white/70'
+                    }`}
+                  >
+                    <CreditCard className="h-4 w-4" />
+                    {credentialReady ? 'Credencial leída' : 'Leer credencial NFC'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={bindDevice}
+                    className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-xs font-bold ${
+                      deviceReady
+                        ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+                        : 'border-white/10 bg-white/5 text-white/70'
+                    }`}
+                  >
+                    <Cpu className="h-4 w-4" />
+                    {deviceReady ? 'Dispositivo ligado' : 'Identidad de dispositivo'}
+                  </button>
+                </div>
+
+                <div>
+                  <label className="mb-2 flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
+                    <KeyRound className="h-4 w-4" /> Factor de contraseña (insuficiente sola)
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Factor adicional — el Gatekeeper decide"
+                    className="w-full rounded border border-white/10 bg-white/5 p-3 font-mono text-sm text-white outline-none focus:border-indigo-500/50"
+                  />
+                </div>
+
+                {pkg && (pkg.metadata.policyLevel === 'CRITICAL' || pkg.metadata.policyLevel === 'ULTRA_CRITICAL') && (
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-200">
+                    <Fingerprint className="mt-0.5 h-4 w-4 shrink-0" />
+                    {pkg.metadata.policyLevel} exige biometría de presencia dentro del Gatekeeper
+                    (MockBiometricProvider · DEVELOPMENT ONLY).
                   </div>
                 )}
-                <input
-                  type="file"
-                  accept=".pkg,application/octet-stream"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void loadPackage(f);
-                  }}
-                  className="w-full cursor-pointer text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-500/20 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-indigo-400"
-                />
-                {file && pkg && (
-                  <div className="mt-2 rounded border border-white/5 bg-black/30 p-2 font-mono text-xs text-indigo-300/80">
-                    {file.name} · {pkg.metadata.policyLevel} · {pkg.documentId}
-                  </div>
-                )}
-                {parseError && <p className="mt-2 text-xs text-rose-400">{parseError}</p>}
-              </div>
 
-              <div>
-                <label className="mb-2 block text-xs font-bold text-white/50 uppercase">2. Operación solicitada</label>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {(['READ', 'RENDER_RAM', 'EXTRACT', 'AUDIT_EXPORT'] as TDCPRequestedOperation[]).map((op) => (
-                    <button
-                      key={op}
-                      type="button"
-                      onClick={() => setOperation(op)}
-                      className={`rounded-lg border px-2 py-2 text-[10px] font-bold ${
-                        operation === op
-                          ? 'border-indigo-500/60 bg-indigo-500/20 text-indigo-200'
-                          : 'border-white/10 bg-black/30 text-white/50'
-                      }`}
-                    >
-                      {op}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <button
-                  type="button"
-                  onClick={tapCredential}
-                  className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-xs font-bold ${
-                    credentialReady
-                      ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
-                      : 'border-white/10 bg-white/5 text-white/70'
-                  }`}
+                  disabled={isUnlocking || !pkg}
+                  onClick={processUnlock}
+                  className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-indigo-500/50 bg-indigo-500/20 p-4 font-bold tracking-wider text-indigo-300 uppercase hover:bg-indigo-500/30 disabled:opacity-50"
                 >
-                  <CreditCard className="h-4 w-4" />
-                  {credentialReady ? 'Credencial leída' : '3. Leer credencial NFC'}
-                </button>
-                <button
-                  type="button"
-                  onClick={bindDevice}
-                  className={`flex items-center justify-center gap-2 rounded-lg border p-3 text-xs font-bold ${
-                    deviceReady
-                      ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
-                      : 'border-white/10 bg-white/5 text-white/70'
-                  }`}
-                >
-                  <Cpu className="h-4 w-4" />
-                  {deviceReady ? 'Dispositivo ligado' : '4. Identidad de dispositivo'}
+                  <Unlock className="h-5 w-5" />
+                  {isUnlocking ? 'Oracle + Gatekeeper...' : 'Solicitar grant y abrir en runtime'}
                 </button>
               </div>
+            </CollapsibleSection>
 
-              <div>
-                <label className="mb-2 flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
-                  <KeyRound className="h-4 w-4" /> 5. Factor de contraseña (insuficiente sola)
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Factor adicional — el Gatekeeper decide"
-                  className="w-full rounded border border-white/10 bg-white/5 p-3 font-mono text-sm text-white outline-none focus:border-indigo-500/50"
-                />
-              </div>
-
-              {pkg && (pkg.metadata.policyLevel === 'CRITICAL' || pkg.metadata.policyLevel === 'ULTRA_CRITICAL') && (
-                <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-200">
-                  <Fingerprint className="mt-0.5 h-4 w-4 shrink-0" />
-                  {pkg.metadata.policyLevel} exige biometría de presencia dentro del Gatekeeper
-                  (MockBiometricProvider · DEVELOPMENT ONLY).
-                </div>
-              )}
-
-              <button
-                disabled={isUnlocking || !pkg}
-                onClick={processUnlock}
-                className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-indigo-500/50 bg-indigo-500/20 p-4 font-bold tracking-wider text-indigo-300 uppercase hover:bg-indigo-500/30 disabled:opacity-50"
-              >
-                <Unlock className="h-5 w-5" />
-                {isUnlocking ? 'Oracle + Gatekeeper...' : 'Solicitar grant y abrir en runtime'}
-              </button>
-            </div>
-
-            <div className="glass-card border-white/10 bg-black/20 p-5">
-              <div className="mb-2 flex items-center gap-2 text-xs font-bold tracking-wider text-indigo-400 uppercase">
-                <Info className="h-4 w-4" /> Camino real
-              </div>
+            <CollapsibleSection
+              title="Camino real"
+              subtitle="Flujo de autorización · formatos"
+              accent="cyan"
+              defaultOpen={false}
+            >
               <p className="text-xs leading-relaxed text-white/60">
                 Paquete → operación → credencial → dispositivo → Oracle → grant firmado de un solo uso →
                 Gatekeeper verifica → clave efímera → AES-GCM → runtime controlado → auditoría → apoptosis.
@@ -403,7 +413,7 @@ export default function DecryptPanel() {
                 <Archive className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-400/80" />
                 EXTRACT sólo si el Oracle emitió un grant con allowExtraction.
               </div>
-            </div>
+            </CollapsibleSection>
           </div>
         ) : (
           <div className="relative flex h-full flex-col overflow-hidden rounded-xl border border-indigo-500/30 bg-black/50">
