@@ -18,6 +18,7 @@ import { tdcpRuntime, TDCP_AUDIT_UPDATED_EVENT } from '../runtime/tdcp-runtime.t
 import type { AuditEvent } from '../audit/audit-event.ts';
 import type { DocumentRevocationState } from '../core/authorization/types.ts';
 import AuthorityOpsStrip from './AuthorityOpsStrip.tsx';
+import CollapsibleSection from './CollapsibleSection.tsx';
 
 export default function MonitorPanel() {
   const [activeTab, setActiveTab] = useState<'audit' | 'killswitch'>('audit');
@@ -141,9 +142,23 @@ export default function MonitorPanel() {
           </span>
         </div>
 
-        <AuthorityOpsStrip />
+        <div className="mb-4 flex shrink-0 flex-col gap-3">
+          <CollapsibleSection
+            title="Ops Authority"
+            subtitle="Salud remota · métricas"
+            accent="cyan"
+            defaultOpen={false}
+          >
+            <AuthorityOpsStrip />
+          </CollapsibleSection>
+          <CollapsibleSection
+            title="Resumen"
+            subtitle="Contadores de la sesión"
+            accent="pink"
+            defaultOpen={false}
+          >
+            <div className="grid grid-cols-2 gap-3">
 
-        <div className="mb-5 grid shrink-0 grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-xl border border-white/10 bg-black/30 p-3">
             <span className="text-[10px] font-bold tracking-wider text-white/40 uppercase">Eventos</span>
             <div className="mt-1 font-mono text-lg font-bold text-white">{stats.total}</div>
@@ -160,9 +175,12 @@ export default function MonitorPanel() {
             <span className="text-[10px] font-bold tracking-wider text-white/40 uppercase">Revocados</span>
             <div className="mt-1 font-mono text-lg font-bold text-pink-400">{stats.revoked}</div>
           </div>
+        
+            </div>
+          </CollapsibleSection>
         </div>
 
-        <div className="mb-4 flex shrink-0 items-center justify-between gap-3 border-b border-white/10 pb-3">
+<div className="mb-4 flex shrink-0 items-center justify-between gap-3 border-b border-white/10 pb-3">
           <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/40 p-1">
             <button
               type="button"

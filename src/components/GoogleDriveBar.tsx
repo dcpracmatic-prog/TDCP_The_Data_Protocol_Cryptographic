@@ -49,7 +49,7 @@ export default function GoogleDriveBar() {
 
   return (
     <>
-      <div className="glass-card p-3 border border-indigo-500/30 bg-indigo-950/40 rounded-xl mb-4 flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="flex flex-col gap-3 rounded-xl border border-indigo-500/30 bg-indigo-950/40 p-3 text-xs sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         
         {/* Estado de Cuenta & Correo */}
         <div className="flex items-center gap-3">

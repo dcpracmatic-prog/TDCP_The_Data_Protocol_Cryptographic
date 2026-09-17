@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FlaskConical, CheckCircle, XCircle, ShieldAlert, Play } from 'lucide-react';
 import { runTDCPTestSuite, type TestCaseResult, type TestSuiteSummary } from '../test/tdcp-test-runner.ts';
+import CollapsibleSection from './CollapsibleSection.tsx';
 
 const CATEGORIES = [
   'CRYPTOGRAPHIC',
@@ -103,7 +104,7 @@ export default function ValidationPanel() {
           </div>
         )}
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-y-auto md:grid-cols-2">
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
           {grouped.map(({ cat, tests, pass, total }) => (
             <div key={cat} className="rounded-xl border border-white/10 bg-black/30 p-3">
               <div className="mb-2 flex items-center justify-between">
@@ -135,12 +136,19 @@ export default function ValidationPanel() {
           ))}
         </div>
 
-        <div className="mt-3 flex items-start gap-2 rounded-lg border border-white/10 bg-black/40 p-3 text-[11px] text-white/50">
+        <CollapsibleSection
+          title="Limitaciones"
+          subtitle="Alcance honesto del navegador"
+          accent="amber"
+          defaultOpen={false}
+        >
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-white/10 bg-black/40 p-3 text-[11px] text-white/50">
           <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />
           Limitaciones del navegador: sin HSM, sin mlock, sin NFC de hardware en este preview, WebAuthn sin
           credencial enrolada. Un atacante con DevTools en el mismo origen sigue viendo RAM. TDCP aquí es
           control de autorización de aplicación, no un enclave.
         </div>
+        </CollapsibleSection>
       </div>
     </div>
   );

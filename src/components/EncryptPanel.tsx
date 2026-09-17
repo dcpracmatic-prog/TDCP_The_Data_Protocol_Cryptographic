@@ -28,6 +28,7 @@ import { evaluatePasswordStrength } from '../lib/password-strength.ts';
 import { tdcpRuntime } from '../runtime/tdcp-runtime.ts';
 import type { PolicyLevel } from '../core/authorization/types.ts';
 import type { TDCPPackage } from '../core/package/package-format.ts';
+import CollapsibleSection from './CollapsibleSection.tsx';
 
 const POLICY_HELP: Record<PolicyLevel, string> = {
   NORMAL: 'Ventana 5 min. Sin marca forense obligatoria.',
@@ -268,7 +269,7 @@ La contraseña es un factor adicional, no una llave de apertura.`;
             </p>
           </div>
 
-          <div className="mx-auto mb-8 grid w-full max-w-5xl grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="mx-auto mb-8 flex w-full max-w-3xl flex-col gap-4">
             <div className="flex flex-col space-y-4">
               <div className="glass-card flex-1 border-l-2 border-l-emerald-500 p-6">
                 <h3 className="mb-4 flex items-center gap-2 text-xs font-bold tracking-wider text-white/60 uppercase">
@@ -398,132 +399,118 @@ La contraseña es un factor adicional, no una llave de apertura.`;
   return (
     <div className="flex h-full min-h-0 flex-col gap-6">
       <div className="glass-panel flex flex-1 flex-col overflow-y-auto p-6">
-        <div className="mb-6 flex items-center justify-between">
+                <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="flex items-center gap-2 text-xl font-bold text-pink-400">
             <Lock className="h-5 w-5" /> TDCP · Crear paquete
           </h2>
-          <div className="flex items-center gap-2 rounded-full border border-pink-500/30 bg-pink-500/10 px-3 py-1 text-[11px] text-pink-300">
+          <div className="flex w-fit items-center gap-2 rounded-full border border-pink-500/30 bg-pink-500/10 px-3 py-1 text-[11px] text-pink-300">
             <ShieldCheck className="h-3.5 w-3.5" /> Gatekeeper-only · v2.5-SEC
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          <div className="space-y-6">
-            <div className="glass-card border-l-2 border-l-pink-500 p-5">
-              <div className="mb-3 flex items-center justify-between">
-                <label className="flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
-                  1. Recurso de origen
-                </label>
-                {isSignedIn && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      openFilePicker((fileBlob, fileName) => {
-                        setFile(new File([fileBlob], fileName, { type: fileBlob.type }));
-                      });
-                    }}
-                    className="flex cursor-pointer items-center gap-1 rounded border border-indigo-500/40 bg-indigo-500/20 px-2.5 py-1 text-[11px] text-indigo-300 hover:bg-indigo-500/30"
-                  >
-                    <HardDrive className="h-3 w-3" /> Importar desde Drive
-                  </button>
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
+          <CollapsibleSection
+            title="1. Origen y factor"
+            subtitle="Archivo + contraseña — flujo principal"
+            accent="pink"
+            defaultOpen
+          >
+            <div className="space-y-4">
+              <div>
+                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <label className="flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
+                    Recurso de origen
+                  </label>
+                  {isSignedIn && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openFilePicker((fileBlob, fileName) => {
+                          setFile(new File([fileBlob], fileName, { type: fileBlob.type }));
+                        });
+                      }}
+                      className="flex cursor-pointer items-center gap-1 rounded border border-indigo-500/40 bg-indigo-500/20 px-2.5 py-1 text-[11px] text-indigo-300 hover:bg-indigo-500/30"
+                    >
+                      <HardDrive className="h-3 w-3" /> Importar desde Drive
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
+                  className="w-full cursor-pointer text-sm text-white/80 file:mr-4 file:rounded-lg file:border-0 file:bg-pink-500/20 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-pink-400 hover:file:bg-pink-500/30"
+                />
+                {file && (
+                  <div className="mt-3 flex items-center justify-between rounded border border-white/5 bg-black/30 p-2.5 font-mono text-xs text-white/70">
+                    <span className="max-w-[200px] truncate sm:max-w-xs">{file.name}</span>
+                    <span className="font-mono text-white/40">{(file.size / 1024).toFixed(1)} KB</span>
+                  </div>
                 )}
               </div>
-              <input
-                type="file"
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
-                className="w-full cursor-pointer text-sm text-white/80 file:mr-4 file:rounded-lg file:border-0 file:bg-pink-500/20 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-pink-400 hover:file:bg-pink-500/30"
-              />
-              {file && (
-                <div className="mt-3 flex items-center justify-between rounded border border-white/5 bg-black/30 p-2.5 font-mono text-xs text-white/70">
-                  <span className="max-w-[200px] truncate">{file.name}</span>
-                  <span className="font-mono text-white/40">{(file.size / 1024).toFixed(1)} KB</span>
+
+              <div className="space-y-3 border-t border-white/5 pt-4">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
+                    <KeyRound className="h-4 w-4" /> Factor de contraseña (no autoriza sola)
+                  </label>
+                  <span className={`shrink-0 text-[10px] font-bold tracking-wider uppercase ${pwdStrength.color}`}>
+                    {pwdStrength.label}
+                  </span>
                 </div>
-              )}
-            </div>
-
-            <div className="glass-card space-y-3 border-l-2 border-l-pink-500 p-5">
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
-                  <KeyRound className="h-4 w-4" /> 2. Factor de contraseña (no autoriza sola)
-                </label>
-                <span className={`text-[10px] font-bold tracking-wider uppercase ${pwdStrength.color}`}>
-                  {pwdStrength.label}
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Factor adicional de derivación"
-                  className="flex-1 rounded border border-white/10 bg-white/5 p-3 font-mono text-sm text-white outline-none focus:border-pink-500/50"
-                />
-                <button
-                  onClick={generatePassword}
-                  className="flex shrink-0 items-center gap-1.5 rounded bg-white/10 px-4 text-xs font-bold uppercase hover:bg-white/20"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" /> Auto
-                </button>
-              </div>
-              <p className="text-[10px] text-white/50">{pwdStrength.feedback}</p>
-            </div>
-
-            <div className="glass-card p-5">
-              <label className="mb-4 flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
-                <EyeOff className="h-4 w-4" /> Preferencias de visor (no son autoridad)
-              </label>
-              <div className="space-y-3">
-                <label className="flex cursor-pointer items-center gap-3">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <input
-                    type="checkbox"
-                    checked={blurMode}
-                    onChange={(e) => setBlurMode(e.target.checked)}
-                    className="h-4 w-4 rounded bg-white/5 text-pink-500"
+                    type="text"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Factor adicional de derivación"
+                    className="min-w-0 flex-1 rounded border border-white/10 bg-white/5 p-3 font-mono text-sm text-white outline-none focus:border-pink-500/50"
                   />
-                  <span className="text-sm">Modo anti-fisgones (UI)</span>
-                </label>
-                <label className="flex cursor-pointer items-start gap-3">
-                  <input
-                    type="checkbox"
-                    checked={watermark}
-                    onChange={(e) => setWatermark(e.target.checked)}
-                    className="mt-1 h-4 w-4 rounded bg-white/5 text-emerald-500"
-                  />
-                  <span className="text-sm text-emerald-300">Solicitar marca forense de sesión</span>
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div className="glass-card p-5">
-              <label className="mb-3 flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
-                <ShieldAlert className="h-4 w-4" /> Nivel de política (Oracle)
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {(['NORMAL', 'STANDARD', 'CRITICAL', 'ULTRA_CRITICAL'] as PolicyLevel[]).map((level) => (
                   <button
-                    key={level}
-                    type="button"
-                    onClick={() => setPolicyLevel(level)}
-                    className={`rounded-lg border px-3 py-2 text-left text-[11px] font-bold ${
-                      policyLevel === level
-                        ? 'border-pink-500/60 bg-pink-500/20 text-pink-200'
-                        : 'border-white/10 bg-black/30 text-white/60 hover:bg-white/5'
-                    }`}
+                    onClick={generatePassword}
+                    className="flex shrink-0 items-center justify-center gap-1.5 rounded bg-white/10 px-4 py-3 text-xs font-bold uppercase hover:bg-white/20 sm:py-0"
                   >
-                    {level.replace('_', ' ')}
+                    <RefreshCw className="h-3.5 w-3.5" /> Auto
                   </button>
-                ))}
+                </div>
+                <p className="text-[10px] text-white/50">{pwdStrength.feedback}</p>
               </div>
-              <p className="mt-2 text-[11px] text-white/50">{POLICY_HELP[policyLevel]}</p>
             </div>
+          </CollapsibleSection>
 
-            <div className="glass-card p-5">
-              <label className="mb-4 flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
-                <Clock className="h-4 w-4" /> Política de uso
-              </label>
-              <div className="space-y-4">
+          <CollapsibleSection
+            title="Política"
+            subtitle="Nivel Oracle · caducidad · EXTRACT"
+            accent="amber"
+            defaultOpen={false}
+          >
+            <div className="space-y-5">
+              <div>
+                <label className="mb-3 flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
+                  <ShieldAlert className="h-4 w-4" /> Nivel de política (Oracle)
+                </label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {(['NORMAL', 'STANDARD', 'CRITICAL', 'ULTRA_CRITICAL'] as PolicyLevel[]).map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      onClick={() => setPolicyLevel(level)}
+                      className={`rounded-lg border px-3 py-2 text-left text-[11px] font-bold ${
+                        policyLevel === level
+                          ? 'border-pink-500/60 bg-pink-500/20 text-pink-200'
+                          : 'border-white/10 bg-black/30 text-white/60 hover:bg-white/5'
+                      }`}
+                    >
+                      {level.replace('_', ' ')}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-2 text-[11px] text-white/50">{POLICY_HELP[policyLevel]}</p>
+              </div>
+
+              <div className="space-y-4 border-t border-white/5 pt-4">
+                <label className="mb-1 flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
+                  <Clock className="h-4 w-4" /> Política de uso
+                </label>
                 <div>
                   <label className="mb-2 flex cursor-pointer items-center gap-3">
                     <input
@@ -567,34 +554,63 @@ La contraseña es un factor adicional, no una llave de apertura.`;
                 </label>
               </div>
             </div>
+          </CollapsibleSection>
 
-            <div className="glass-card border-indigo-500/20 bg-indigo-500/5 p-4">
-              <div className="mb-2 flex items-center gap-2 text-xs font-bold tracking-wider text-indigo-400 uppercase">
-                <Info className="h-4 w-4" /> Render en runtime controlado
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div className="flex items-center gap-1.5 rounded bg-black/20 p-1.5 text-white/80">
-                  <FileText className="h-3.5 w-3.5 shrink-0 text-indigo-400" /> PDF, TXT, JSON
+          <CollapsibleSection
+            title="Avanzado"
+            subtitle="Visor · marca forense · formatos"
+            accent="indigo"
+            defaultOpen={false}
+          >
+            <div className="space-y-4">
+              <label className="flex items-center gap-2 text-xs font-bold text-white/50 uppercase">
+                <EyeOff className="h-4 w-4" /> Preferencias de visor (no son autoridad)
+              </label>
+              <label className="flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={blurMode}
+                  onChange={(e) => setBlurMode(e.target.checked)}
+                  className="h-4 w-4 rounded bg-white/5 text-pink-500"
+                />
+                <span className="text-sm">Modo anti-fisgones (UI)</span>
+              </label>
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={watermark}
+                  onChange={(e) => setWatermark(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded bg-white/5 text-emerald-500"
+                />
+                <span className="text-sm text-emerald-300">Solicitar marca forense de sesión</span>
+              </label>
+
+              <div className="border-t border-white/5 pt-4">
+                <div className="mb-2 flex items-center gap-2 text-xs font-bold tracking-wider text-indigo-400 uppercase">
+                  <Info className="h-4 w-4" /> Render en runtime controlado
                 </div>
-                <div className="flex items-center gap-1.5 rounded bg-black/20 p-1.5 text-white/80">
-                  <ImageIcon className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> PNG, JPG, WEBP
+                <div className="grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-2">
+                  <div className="flex items-center gap-1.5 rounded bg-black/20 p-1.5 text-white/80">
+                    <FileText className="h-3.5 w-3.5 shrink-0 text-indigo-400" /> PDF, TXT, JSON
+                  </div>
+                  <div className="flex items-center gap-1.5 rounded bg-black/20 p-1.5 text-white/80">
+                    <ImageIcon className="h-3.5 w-3.5 shrink-0 text-emerald-400" /> PNG, JPG, WEBP
+                  </div>
+                  <div className="flex items-center gap-1.5 rounded bg-black/20 p-1.5 text-white/80">
+                    <Music className="h-3.5 w-3.5 shrink-0 text-pink-400" /> MP3, WAV
+                  </div>
+                  <div className="flex items-center gap-1.5 rounded bg-black/20 p-1.5 text-white/80">
+                    <Video className="h-3.5 w-3.5 shrink-0 text-purple-400" /> MP4, WebM
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 rounded bg-black/20 p-1.5 text-white/80">
-                  <Music className="h-3.5 w-3.5 shrink-0 text-pink-400" /> MP3, WAV
+                <div className="mt-2 flex items-center gap-1.5 text-[10px] text-white/40">
+                  <Archive className="h-3 w-3 shrink-0" />
+                  Binarios no renderizables requieren política EXTRACT.
                 </div>
-                <div className="flex items-center gap-1.5 rounded bg-black/20 p-1.5 text-white/80">
-                  <Video className="h-3.5 w-3.5 shrink-0 text-purple-400" /> MP4, WebM
-                </div>
-              </div>
-              <div className="mt-2 flex items-center gap-1.5 text-[10px] text-white/40">
-                <Archive className="h-3 w-3 shrink-0" />
-                Binarios no renderizables requieren política EXTRACT.
               </div>
             </div>
-          </div>
-        </div>
+          </CollapsibleSection>
 
-        <div className="mt-8">
           <button
             disabled={isEncrypting}
             onClick={processEncrypt}

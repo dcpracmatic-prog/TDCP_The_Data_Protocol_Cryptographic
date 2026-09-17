@@ -64,7 +64,7 @@ export default function AuthorityOpsStrip() {
   }, [url, health.state]);
 
   return (
-    <div className="mb-5 shrink-0 rounded-xl border border-cyan-500/25 bg-cyan-500/5 p-3">
+    <div className="shrink-0 rounded-xl border border-cyan-500/25 bg-cyan-500/5 p-3">
       <div className="mb-2 flex items-center gap-2 text-[11px] font-bold tracking-wider text-cyan-200 uppercase">
         <Server className="h-3.5 w-3.5" /> Ops — Authority
       </div>
