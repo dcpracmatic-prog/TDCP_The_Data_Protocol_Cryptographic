@@ -77,6 +77,21 @@ Do **not** change crypto primitives or Gatekeeper security semantics under these
 **Exit criteria:** Admin auth + ops endpoints tested; docs honest about non-production file/kms-stub signing.  
 **Remaining true blockers for paid launch:** real KMS/HSM, independent review, ToS/DPA, multi-tenant isolation, encrypted backups.
 
+
+## P6 — Operational MVP (one-command stack + demo UX) — **DONE**
+
+**Goal:** A stranger can start Authority + Web with one command, enter Encrypt/Decrypt/Monitor via demo gate, see Authority health, and run smoke.
+
+- [x] `./scripts/start-mvp.sh` / `./scripts/stop-mvp.sh` + `.mvp/` pids/logs
+- [x] Demo button «Continuar en modo demo (MVP)» (local session; no Firebase/Gemini)
+- [x] Authority status banner + Connected/Offline chip; Monitor Ops strip (`/metrics`)
+- [x] CORS on Authority for browser Gatekeeper path
+- [x] `npm run smoke:mvp` — health/ready/register/authorize
+- [x] README MVP Quickstart (EN+ES) + `MVP.md`
+
+**Exit criteria:** Operational feel without false HSM claims.  
+**Remaining for paid production:** real KMS/HSM, multi-tenant, ToS/DPA, independent review (see `MVP.md`).
+
 ## Explicitly deferred
 
 - Full IRM SaaS parity (Seclore / Virtru / Digify feature race)

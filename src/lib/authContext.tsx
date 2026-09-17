@@ -65,6 +65,7 @@ interface AuthContextType {
     newPassword: string;
   }) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
+  enterDemoSession: () => void;
   generateCustomUserId: (prefix?: string) => string;
 }
 
@@ -470,6 +471,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCurrentUser(null);
   };
 
+  /** Local MVP demo gate — does not call Firebase/Gemini and does not weaken crypto. */
+  const enterDemoSession = () => {
+    const demoUser: DCPUser = {
+      id: 'DCP-DEMO-MVP-0001',
+      name: 'Demo MVP',
+      email: 'demo@tdcp.local',
+      passwordHash: '',
+      securityQuestion: 'demo',
+      securityAnswerHash: '',
+      driveFolderLink: '',
+      driveFolderId: '',
+      sharedFolders: [],
+      createdAt: Date.now(),
+      lastLogin: Date.now(),
+    };
+    localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(demoUser));
+    setCurrentUser(demoUser);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -484,6 +504,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setDefaultFolder,
         recoverPassword,
         logout,
+        enterDemoSession,
         generateCustomUserId
       }}
     >
