@@ -68,18 +68,21 @@ Viability depends on control-plane credibility (remote Authority + review), not 
 
 ## Relationship to ATL Edge (future)
 
-ATL Edge (or similar agent runtimes) may later unlock TDCP packages **only through the Gatekeeper**, never by holding long-lived content keys in the agent. That bridge is a **future design note** (see `ROADMAP.md` P3). This repository does **not** implement ATL Edge code.
+ATL Edge (or similar agent runtimes) may later unlock TDCP packages **only through the Gatekeeper**, never by holding long-lived content keys in the agent. That bridge is a **design note** (`docs/ATL_EDGE_BRIDGE.md`, ROADMAP P3). This repository does **not** implement ATL Edge code.
 
-## Success metrics (next milestone)
+## Success metrics (Authority stub shipped)
 
-Next milestone = **Remote Authorization Authority design + stub interface** (ROADMAP P0), then durable revoke/replay (P1).
+P0–P4 foundation landed: remote Authority interface + durable MVP stub, integrator docs/SDK, ATL design note, demo badges, launch packaging. See `ROADMAP.md`.
 
 | Metric | Signal |
 |--------|--------|
-| Authority interface published | Stable types/API for remote grant issue, revoke, replay, challenge |
-| Integrator clarity | Gatekeeper remains the only unlock path; docs point to PRODUCT + ROADMAP |
-| Honesty preserved | No HSM/production claims for browser Oracle; AUDIT non-claims intact |
+| Authority interface published | `src/authority/` + `docs/AUTHORITY.md` + HTTP service |
+| Durable revoke/replay testable | File-backed store; tests survive store restart |
+| Integrator clarity | Gatekeeper-only unlock; `docs/INTEGRATOR_API.md` + `sdk/typescript/` |
+| Honesty preserved | No HSM claims for browser Oracle or file JWK Authority; AUDIT non-claims intact |
 | SDK direction | TS surface is the product SDK path; Python remains labeled demo |
-| Review readiness | Architecture ready for independent security review of Authority design |
+| Review readiness | Design ready for independent security review; real HSM still required for prod claims |
 
-Further detail: `ROADMAP.md`, `ARCHITECTURE.md`, `AUDIT_2.5.1.md`.
+**Next commercial blockers:** HSM/KMS signing, formal security review, billing/legal for hosted Authority (`LAUNCH.md`, `docs/GTM.md`).
+
+Further detail: `ROADMAP.md`, `ARCHITECTURE.md`, `AUDIT_2.5.1.md`, `docs/AUTHORITY.md`.

@@ -33,9 +33,11 @@ This repository ships a **browser / in-process Oracle** for the reference implem
 - Revocation, replay, and challenge state are not durable remote state
 - A compromised JavaScript environment is **not** a production security boundary
 
-**Next architectural step:** a remote Authorization Authority backed by HSM/KMS (or platform Secure Key Store), with durable policy, revocation, replay, and signing-key state independent of the client. The browser should receive only the minimum material required for the authorized operation.
+**Authority path (foundation shipped):** `docs/AUTHORITY.md`, `src/authority/`, `server/authority/` provide a remote-capable interface, HTTP service, and **file-backed durable** revoke/replay. Production still requires HSM/KMS (or platform Secure Key Store) for signing keys — the durable JSON/JWK store is an MVP stub, not hardware.
 
-Do not describe the current browser Oracle as a remote sovereign authority, TPM, HSM, or hardware-backed boundary.
+Set `TDCP_AUTHORITY_URL` to use `HttpAuthorityClient`; otherwise the in-process Oracle remains the demo default.
+
+Do not describe the current browser Oracle (or the file JWK Authority stub) as a remote sovereign HSM, TPM, or hardware-backed boundary.
 
 ## Cryptographic building blocks (reference)
 

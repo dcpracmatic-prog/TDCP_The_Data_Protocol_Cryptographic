@@ -22,7 +22,7 @@ jobs:
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-      - name: Test (protocol + auth/app-data)
+      - name: Test (protocol + auth/app-data + Authority)
         run: npm test
 
       - name: Typecheck

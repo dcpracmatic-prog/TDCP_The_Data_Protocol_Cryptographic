@@ -42,6 +42,9 @@ sdk/python/__pycache__/
 sdk/python/.venv/
 sdk/python/*.pyc
 *.egg-info/
+# Authority durable state (local control-plane data; never commit secrets/wrap keys)
+data/authority/**
+!data/authority/.gitkeep
 # Misc sandbox noise
 public/__grok/
 screenshots/

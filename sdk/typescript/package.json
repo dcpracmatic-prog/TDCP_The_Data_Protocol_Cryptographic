@@ -1,0 +1,13 @@
+{
+  "name": "@tdcp/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "TDCP TypeScript integrator helpers — Gatekeeper-only unlock surface",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {},
+  "license": "SEE LICENSE IN ../../LICENSE"
+}

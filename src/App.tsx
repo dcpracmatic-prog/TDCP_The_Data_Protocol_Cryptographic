@@ -176,7 +176,16 @@ function MainDCPApp() {
                 </span>
                 <span className="font-mono text-white/40">v2.5 SEC</span>
               </div>
+              <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[9px] font-bold leading-snug tracking-wide text-amber-100 uppercase">
+                {providers.modeBadge || 'Reference / Demo — Oracle in-browser'}
+              </div>
               <div className="space-y-1.5 text-[11px] text-white/60">
+                <div className="flex items-center justify-between">
+                  <span>Control plane</span>
+                  <span className="font-mono font-bold text-amber-300">
+                    {providers.authorityKind === 'HTTP_REMOTE' ? 'REMOTE' : 'IN-PROCESS'}
+                  </span>
+                </div>
                 <div className="flex items-center justify-between">
                   <span>Oracle keys</span>
                   <span className="font-mono font-bold text-amber-300">DEV ONLY</span>

@@ -24,6 +24,9 @@ import {
   wipeBuffer,
 } from '../core/crypto/primitives.ts';
 import { AuthorizationOracle, globalAuthorizationOracle } from '../oracle/authorization-oracle.ts';
+import type { AuthorizationAuthority } from '../authority/types.ts';
+import { InProcessAuthority } from '../authority/in-process-authority.ts';
+import { resolveAuthorizationAuthority } from '../authority/resolve-authority.ts';
 import { ControlledRuntimeSession } from '../protection/apoptosis.ts';
 import { generateForensicWatermark } from '../protection/watermark.ts';
 import type { ForensicWatermarkData } from '../protection/watermark.ts';
@@ -41,7 +44,13 @@ export interface GatekeeperUnlockOptions {
   nfcProvider: NFCProvider;
   deviceProvider: DeviceIdentityProvider;
   biometricProvider?: BiometricProvider;
+  /** @deprecated Prefer `authority`. Kept for backward-compatible demo/tests. */
   oracle?: AuthorizationOracle;
+  /**
+   * Optional Authorization Authority (in-process Oracle adapter or HTTP remote).
+   * When omitted: if `oracle` is set, wrap it; else resolve via TDCP_AUTHORITY_URL / in-process.
+   */
+  authority?: AuthorizationAuthority;
   auditSink?: AuditSink;
   customChallenge?: string;
 }
@@ -73,10 +82,19 @@ export class DCPGatekeeper {
       nfcProvider,
       deviceProvider,
       biometricProvider,
-      oracle = globalAuthorizationOracle,
+      oracle,
+      authority: authorityOption,
       auditSink = globalAuditSink,
       customChallenge,
     } = options;
+
+    // Additive Authority path: prefer explicit authority, else wrap oracle, else env resolve.
+    const authority: AuthorizationAuthority =
+      authorityOption ??
+      (oracle
+        ? new InProcessAuthority(oracle)
+        : resolveAuthorizationAuthority({ oracle: globalAuthorizationOracle }));
+    await authority.initialize();
 
     // Reject malformed/tampered envelopes before any authorization work.
     const computedIntegrity = await computePackageIntegrityHash(packageData);
@@ -91,7 +109,7 @@ export class DCPGatekeeper {
     const operationId = generateRandomId('OP');
     // Test harnesses may inject a challenge, but the challenge must already be
     // registered. Production flow always obtains a fresh challenge from Oracle.
-    const challenge = customChallenge || oracle.issueChallenge();
+    const challenge = customChallenge || (await authority.issueChallenge());
 
     let credential;
     try {
@@ -117,7 +135,7 @@ export class DCPGatekeeper {
       };
     }
 
-    const registeredPolicy = oracle.getDocumentPolicy(packageData.documentId);
+    const registeredPolicy = await authority.getDocumentPolicy(packageData.documentId);
     if (!registeredPolicy || registeredPolicy.packageId !== packageData.packageId) {
       return {
         success: false,
@@ -204,7 +222,7 @@ export class DCPGatekeeper {
       }
     }
 
-    if (customChallenge && !oracle.getReplayRegistry().isValidChallenge(challenge)) {
+    if (customChallenge && !(await authority.isValidChallenge(challenge))) {
       return {
         success: false,
         errorCode: 'INVALID_CHALLENGE',
@@ -227,7 +245,7 @@ export class DCPGatekeeper {
       },
     };
 
-    const authResponse = await oracle.processAuthorizationRequest(authRequest);
+    const authResponse = await authority.processAuthorizationRequest(authRequest);
 
     if (!authResponse.granted || !authResponse.grant) {
       await auditSink.recordEvent({
@@ -250,10 +268,10 @@ export class DCPGatekeeper {
     }
 
     const grant = authResponse.grant;
-    const currentEpoch = oracle.getRevocationManager().getOrCreateState(packageData.documentId)
+    const currentEpoch = (await authority.getDocumentRevocationState(packageData.documentId))
       .currentEpoch;
 
-    const oraclePublicKey = await oracle.getPublicKey();
+    const oraclePublicKey = await authority.getPublicKey();
     const verification = await verifyAuthorizationGrant(grant, oraclePublicKey, {
       targetDocumentId: packageData.documentId,
       targetDeviceId: device.deviceId,
@@ -285,7 +303,7 @@ export class DCPGatekeeper {
       };
     }
 
-    const wrapSecret = await oracle.releaseDocumentWrapSecretForGrant(grant);
+    const wrapSecret = await authority.releaseDocumentWrapSecretForGrant(grant);
     if (!wrapSecret) {
       await auditSink.recordEvent({
         documentId: packageData.documentId,
@@ -414,7 +432,7 @@ export class DCPGatekeeper {
     }
 
     if (registeredPolicy.viewOnce) {
-      oracle.commitViewOnce(packageData.documentId, grant.grantId);
+      await authority.commitViewOnce(packageData.documentId, grant.grantId);
     }
 
     const session = new ControlledRuntimeSession(generateRandomId('SESSION'), 300000);
