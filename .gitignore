@@ -50,3 +50,5 @@ public/__grok/
 screenshots/
 attachments/
 .vercel/
+# Dev mTLS certs from scripts/gen-dev-mtls.sh (never commit)
+data/mtls-dev/

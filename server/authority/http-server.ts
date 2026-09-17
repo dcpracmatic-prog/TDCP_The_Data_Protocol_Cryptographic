@@ -1,17 +1,26 @@
 /**
- * Node HTTP Authorization Authority service.
+ * Node HTTP(S) Authorization Authority service.
  *
  * Public (Gatekeeper): challenge, authorize, wrap-secret release, policy/revocation get, public-key
- * Admin (Bearer TDCP_AUTHORITY_ADMIN_TOKEN): register, revoke, restore, list documents/revoked
+ * Admin (token | OIDC JWT | mTLS | oidc+mtls): register, revoke, restore, list documents/revoked
  * Ops: /health, /ready, /metrics
  *
  * HONESTY: Durable file store + WebCrypto ECDSA is an MVP stub, not HSM.
+ * Admin auth hardening is not a full enterprise IdP product — see docs/ADMIN_AUTH.md.
  */
 
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
+import type { TlsOptions } from 'node:tls';
 import { arrayBufferToBase64 } from '../../src/core/crypto/primitives.ts';
 import { DurableAuthorityService } from './service.ts';
-import { isAdminPath, requireAdminAuth, readAdminTokenFromEnv } from './admin-auth.ts';
+import {
+  isAdminPath,
+  requireAdminAuth,
+  loadAdminAuthConfigFromEnv,
+  type AdminAuthConfig,
+} from './admin-auth.ts';
+import { buildTlsOptions, readTlsEnv } from './tls-options.ts';
 import { InMemoryRateLimiter, clientKey } from './rate-limit.ts';
 import { AuthorityMetrics } from './metrics.ts';
 import { logRequest } from './request-log.ts';
@@ -63,7 +72,12 @@ export interface AuthorityHttpServerOptions {
   host?: string;
   dataDir: string;
   service?: DurableAuthorityService;
+  /** @deprecated Prefer adminAuth. Kept for existing tests (token mode). */
   adminToken?: string;
+  /** Full admin auth config. If omitted, loaded from env (or token-mode from adminToken). */
+  adminAuth?: AdminAuthConfig;
+  /** TLS options; if set, serves HTTPS. Built from env when omitted and cert files present. */
+  tls?: TlsOptions | null;
   rateLimit?: { windowMs?: number; maxHits?: number };
   metrics?: AuthorityMetrics;
 }
@@ -74,8 +88,32 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
 
   const host = options.host ?? '0.0.0.0';
   const port = options.port ?? Number(process.env.TDCP_AUTHORITY_PORT || 8787);
-  const adminToken =
-    options.adminToken !== undefined ? options.adminToken : readAdminTokenFromEnv();
+
+  let adminAuth: AdminAuthConfig;
+  if (options.adminAuth) {
+    adminAuth = options.adminAuth;
+  } else if (options.adminToken !== undefined) {
+    adminAuth = { mode: 'token', token: options.adminToken };
+  } else {
+    adminAuth = loadAdminAuthConfigFromEnv();
+  }
+
+  let tls: TlsOptions | null | undefined = options.tls;
+  if (tls === undefined) {
+    try {
+      tls = buildTlsOptions(readTlsEnv(process.env as Record<string, string | undefined>, adminAuth.mode));
+    } catch (err) {
+      // Fail loudly at listen time for misconfigured TLS in production modes
+      if (adminAuth.mode === 'mtls' || adminAuth.mode === 'oidc+mtls') {
+        throw err;
+      }
+      console.warn(
+        `[tdcp-authority] TLS config skipped: ${err instanceof Error ? err.message : String(err)}`
+      );
+      tls = null;
+    }
+  }
+
   const metrics = options.metrics ?? new AuthorityMetrics();
   const limiter = new InMemoryRateLimiter({
     windowMs:
@@ -85,7 +123,7 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
       options.rateLimit?.maxHits ?? Number(process.env.TDCP_AUTHORITY_RATE_MAX || 120),
   });
 
-  const server = createServer(async (req, res) => {
+  const handler = async (req: IncomingMessage, res: ServerResponse) => {
     const started = Date.now();
     const method = req.method || 'GET';
     const url = req.url || '/';
@@ -113,6 +151,8 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
           ok: true,
           service: 'tdcp-authority',
           developmentOnly: true,
+          adminAuthMode: adminAuth.mode,
+          tls: Boolean(tls),
         });
         finish(200);
         return;
@@ -121,7 +161,11 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
       if (method === 'GET' && (path === '/ready' || path === '/readyz')) {
         const readiness = service.getReadiness();
         const status = readiness.ready ? 200 : 503;
-        sendJson(res, status, { ...readiness, service: 'tdcp-authority' });
+        sendJson(res, status, {
+          ...readiness,
+          service: 'tdcp-authority',
+          adminAuthMode: adminAuth.mode,
+        });
         finish(status, readiness.ready ? undefined : 'NOT_READY');
         return;
       }
@@ -138,7 +182,7 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
       }
 
       if (isAdminPath(method, path)) {
-        const auth = requireAdminAuth(req, adminToken);
+        const auth = await requireAdminAuth(req, adminAuth);
         if (!auth.ok) {
           metrics.adminUnauthorized += 1;
           sendJson(res, auth.status, { error: auth.error });
@@ -299,7 +343,11 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
       sendJson(res, 500, { error: message });
       finish(500, 'INTERNAL');
     }
-  });
+  };
+
+  const server: Server = tls
+    ? createHttpsServer(tls, handler)
+    : createServer(handler);
 
   await new Promise<void>((resolve) => {
     server.listen(port, host, () => resolve());
@@ -311,6 +359,9 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
     port,
     host,
     metrics,
-    adminTokenConfigured: Boolean(adminToken),
+    adminAuth,
+    adminAuthMode: adminAuth.mode,
+    adminTokenConfigured: adminAuth.mode === 'token' && Boolean(adminAuth.token),
+    tlsEnabled: Boolean(tls),
   };
 }

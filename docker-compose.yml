@@ -11,9 +11,26 @@ services:
     environment:
       - TDCP_AUTHORITY_PORT=8787
       - TDCP_AUTHORITY_DATA_DIR=/data/authority
-      # Local compose default only — change before any shared deploy
+      # Default stays token mode so ./scripts/start-prod-stack.sh keeps working.
+      # For OIDC/mTLS see docs/ADMIN_AUTH.md (set TDCP_AUTHORITY_ADMIN_AUTH + related env).
+      - TDCP_AUTHORITY_ADMIN_AUTH=${TDCP_AUTHORITY_ADMIN_AUTH:-token}
+      # Local compose default only — change before any shared deploy; ignored when mode≠token
       - TDCP_AUTHORITY_ADMIN_TOKEN=${TDCP_AUTHORITY_ADMIN_TOKEN:-local-dev-only-change-me}
       - TDCP_SIGNING_BACKEND=${TDCP_SIGNING_BACKEND:-file}
+      # Optional OIDC (pass through when set on host)
+      - TDCP_OIDC_ISSUER=${TDCP_OIDC_ISSUER:-}
+      - TDCP_OIDC_AUDIENCE=${TDCP_OIDC_AUDIENCE:-}
+      - TDCP_OIDC_JWKS_URL=${TDCP_OIDC_JWKS_URL:-}
+      - TDCP_OIDC_ADMIN_CLAIM=${TDCP_OIDC_ADMIN_CLAIM:-tdcp_admin}
+      # Optional mTLS/HTTPS — mount certs and set paths, e.g.:
+      #   volumes: [ ./data/mtls-dev:/certs:ro, authority-data:/data/authority ]
+      #   TDCP_AUTHORITY_TLS_CERT_FILE=/certs/server.crt
+      #   TDCP_AUTHORITY_TLS_KEY_FILE=/certs/server.key
+      #   TDCP_MTLS_CA_FILE=/certs/ca.crt
+      - TDCP_AUTHORITY_TLS_CERT_FILE=${TDCP_AUTHORITY_TLS_CERT_FILE:-}
+      - TDCP_AUTHORITY_TLS_KEY_FILE=${TDCP_AUTHORITY_TLS_KEY_FILE:-}
+      - TDCP_MTLS_CA_FILE=${TDCP_MTLS_CA_FILE:-}
+      - TDCP_MTLS_ALLOWED_CNS=${TDCP_MTLS_ALLOWED_CNS:-}
     volumes:
       - authority-data:/data/authority
     healthcheck:
@@ -59,3 +76,13 @@ services:
 
 volumes:
   authority-data:
+
+# --- mTLS profile note (optional; does not change default stack) ---
+# 1. ./scripts/gen-dev-mtls.sh
+# 2. Mount data/mtls-dev into the authority service and set:
+#      TDCP_AUTHORITY_ADMIN_AUTH=mtls
+#      TDCP_AUTHORITY_TLS_CERT_FILE=/certs/server.crt
+#      TDCP_AUTHORITY_TLS_KEY_FILE=/certs/server.key
+#      TDCP_MTLS_CA_FILE=/certs/ca.crt
+#      TDCP_MTLS_ALLOWED_CNS=tdcp-admin-dev
+# Default ./scripts/start-prod-stack.sh remains token-mode HTTP on :8787.
