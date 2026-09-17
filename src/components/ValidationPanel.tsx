@@ -70,12 +70,12 @@ export default function ValidationPanel() {
   });
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-5">
-      <div className="glass-panel flex flex-1 flex-col overflow-hidden p-5 md:p-6">
-        <div className="mb-4 flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="glass-panel flex min-h-0 flex-1 flex-col overflow-hidden p-3 md:p-4">
+        <div className="mb-2 flex flex-col gap-1.5 border-b border-white/10 pb-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="flex items-center gap-2 text-xl font-bold text-amber-300">
-              <FlaskConical className="h-5 w-5" /> Validación TDCP
+            <h2 className="flex items-center gap-2 text-base font-bold text-amber-300">
+              <FlaskConical className="h-4 w-4" /> Validación TDCP
             </h2>
             <p className="mt-1 max-w-xl text-xs text-white/50">
               Cada resultado sale de una prueba ejecutada. Este panel no afirma “100% secure”,

@@ -137,15 +137,14 @@ export function AuthorityStatusBar() {
   }
 
   return (
-    <div className="mb-3 flex flex-col gap-2 rounded-xl border border-white/10 bg-black/50 px-3 py-2.5 md:flex-row md:items-center md:justify-between">
-      <div className="min-w-0 space-y-1">
-        <p className="text-[11px] font-semibold leading-snug text-white/85">{bannerText}</p>
-        <p className="text-[10px] leading-snug text-white/45">
-          Copiar el archivo no copia el derecho a usarlo · Copying the file does not copy the right to
-          use it.
-        </p>
-      </div>
-      <div className="shrink-0">
+    <div className="mb-2 flex shrink-0 items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/50 px-2.5 py-1.5">
+      <p
+        className="min-w-0 truncate text-[10px] font-semibold leading-tight text-white/80"
+        title="Copiar el archivo no copia el derecho a usarlo · Copying the file does not copy the right to use it."
+      >
+        {bannerText}
+      </p>
+      <div className="hidden shrink-0 sm:block">
         <AuthorityStatusChip />
       </div>
     </div>

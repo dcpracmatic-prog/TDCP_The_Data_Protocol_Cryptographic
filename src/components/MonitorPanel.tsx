@@ -126,23 +126,23 @@ export default function MonitorPanel() {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-5">
-      <div className="glass-panel flex flex-1 flex-col overflow-hidden p-5 md:p-6">
-        <div className="mb-5 flex shrink-0 flex-col items-start justify-between gap-3 border-b border-white/10 pb-4 md:flex-row md:items-center">
+    <div className="flex h-full min-h-0 flex-col gap-2">
+      <div className="glass-panel flex min-h-0 flex-1 flex-col overflow-hidden p-3 md:p-4">
+        <div className="mb-2 flex shrink-0 flex-col items-start justify-between gap-1.5 border-b border-white/10 pb-2 md:flex-row md:items-center">
           <div>
-            <h2 className="flex items-center gap-2 text-xl font-bold text-pink-400">
-              <Activity className="h-5 w-5" /> Auditoría y revocación
+            <h2 className="flex items-center gap-2 text-base font-bold text-pink-400">
+              <Activity className="h-4 w-4" /> Auditoría y revocación
             </h2>
-            <p className="mt-0.5 text-xs text-white/50">
-              {tdcpRuntime.auditSink.integrityClaim}. Oracle epoch es la autoridad del kill-switch.
+            <p className="mt-0.5 truncate text-[10px] text-white/45" title={tdcpRuntime.auditSink.integrityClaim}>
+              {tdcpRuntime.auditSink.integrityClaim}. Epoch = kill-switch.
             </p>
           </div>
-          <span className="flex items-center gap-1.5 rounded-full border border-pink-500/30 bg-pink-500/10 px-2.5 py-1 font-mono text-[10px] text-pink-300">
-            <Lock className="h-3.5 w-3.5" /> no localStorage de seguridad
+          <span className="flex items-center gap-1.5 rounded-full border border-pink-500/30 bg-pink-500/10 px-2 py-0.5 font-mono text-[9px] text-pink-300">
+            <Lock className="h-3 w-3" /> no localStorage
           </span>
         </div>
 
-        <div className="mb-4 grid shrink-0 grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="mb-2 grid shrink-0 grid-cols-1 gap-2 lg:grid-cols-2">
           <CollapsibleSection
             title="Ops Authority"
             subtitle="Salud remota · métricas"
@@ -180,7 +180,7 @@ export default function MonitorPanel() {
           </CollapsibleSection>
         </div>
 
-<div className="mb-4 flex shrink-0 items-center justify-between gap-3 border-b border-white/10 pb-3">
+<div className="mb-2 flex shrink-0 items-center justify-between gap-2 border-b border-white/10 pb-2">
           <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-black/40 p-1">
             <button
               type="button"
@@ -259,9 +259,9 @@ export default function MonitorPanel() {
             </div>
             <div className="flex-1 space-y-2 overflow-y-auto pr-1">
               {filteredLogs.length === 0 ? (
-                <div className="flex h-48 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/20 p-6 text-center">
-                  <Database className="mb-2 h-8 w-8 text-white/20" />
-                  <p className="text-xs text-white/50">Sin eventos todavía.</p>
+                <div className="flex h-28 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/20 p-4 text-center">
+                  <Database className="mb-1.5 h-6 w-6 text-white/20" />
+                  <p className="text-[11px] text-white/50">Sin eventos todavía.</p>
                 </div>
               ) : (
                 filteredLogs
@@ -314,20 +314,22 @@ export default function MonitorPanel() {
 
         {activeTab === 'killswitch' && (
           <div className="flex-1 overflow-y-auto">
-            <div className="mx-auto w-full max-w-6xl space-y-6 py-2">
-              <div className="mb-2 text-center md:text-left">
-                <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full border border-pink-500/50 bg-pink-500/20 md:mx-0">
-                  <ShieldAlert className="h-7 w-7 text-pink-400" />
+            <div className="w-full space-y-3 py-1">
+              <div className="mb-1 flex items-center gap-2">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-pink-500/50 bg-pink-500/20">
+                  <ShieldAlert className="h-4 w-4 text-pink-400" />
                 </div>
-                <h3 className="mb-1.5 text-lg font-bold text-white">Revocación por epoch</h3>
-                <p className="mx-auto max-w-md text-xs leading-relaxed text-white/60 md:mx-0">
-                  El Oracle incrementa authorizationEpoch e isRevoked=true. localStorage no es autoridad.
-                </p>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-white">Revocación por epoch</h3>
+                  <p className="truncate text-[10px] text-white/50" title="El Oracle incrementa authorizationEpoch e isRevoked=true. localStorage no es autoridad.">
+                    Oracle epoch++ · localStorage no es autoridad
+                  </p>
+                </div>
               </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
-                <div className="space-y-4">
-                  <div className="glass-card space-y-4 border-l-2 border-l-pink-500 p-6">
-                    <label className="mb-2 block text-xs font-bold text-white/50 uppercase">
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
+                <div className="space-y-3">
+                  <div className="glass-card space-y-3 border-l-2 border-l-pink-500 p-3">
+                    <label className="mb-1 block text-[11px] font-bold text-white/50 uppercase">
                       MONITOR-DOC-... (documentId)
                     </label>
                     <input
@@ -335,13 +337,13 @@ export default function MonitorPanel() {
                       value={monitorKey}
                       onChange={(e) => setMonitorKey(e.target.value)}
                       placeholder="MONITOR-DOC-..."
-                      className="w-full rounded-lg border border-white/10 bg-black/40 p-3.5 font-mono text-sm text-pink-300 outline-none"
+                      className="w-full rounded-lg border border-white/10 bg-black/40 p-2.5 font-mono text-sm text-pink-300 outline-none"
                     />
                     <button
                       onClick={handleKillSwitch}
-                      className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-pink-500/50 bg-pink-500/20 p-4 font-bold tracking-wider text-pink-300 uppercase"
+                      className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-pink-500/50 bg-pink-500/20 p-3 text-sm font-bold tracking-wider text-pink-300 uppercase"
                     >
-                      <Ban className="h-5 w-5" /> Revocar (epoch++)
+                      <Ban className="h-4 w-4" /> Revocar (epoch++)
                     </button>
                   </div>
                   {status && (
@@ -361,9 +363,9 @@ export default function MonitorPanel() {
                     </div>
                   )}
                 </div>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {revoked.length > 0 ? (
-                    <div className="glass-card space-y-3 border border-white/10 p-5">
+                    <div className="glass-card space-y-2 border border-white/10 p-3">
                       {revoked.map((item) => (
                         <div
                           key={item.documentId}
@@ -385,7 +387,7 @@ export default function MonitorPanel() {
                       ))}
                     </div>
                   ) : (
-                    <div className="glass-card flex h-full min-h-32 items-center justify-center border border-dashed border-white/10 p-5 text-center text-xs text-white/40">
+                    <div className="glass-card flex min-h-20 items-center justify-center border border-dashed border-white/10 p-3 text-center text-[11px] text-white/40">
                       Sin documentos revocados en esta sesión.
                     </div>
                   )}
