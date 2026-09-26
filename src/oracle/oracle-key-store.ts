@@ -6,8 +6,10 @@
  * durable file JWK (Authority MVP). Private keys must NEVER ship to browsers
  * as production Authority material.
  *
- * Production: plug AWS KMS / CloudHSM / platform Secure Key Store via
+ * Production: plug HSM / platform Secure Key Store / your KMS via
  * OracleKeyStore (prefer signCanonical when private key is non-exportable).
+ * This tree does not depend on the AWS SDK. Authority file keys can be
+ * encrypted at rest with TDCP_AUTHORITY_KEY_PASSPHRASE (see server/authority).
  */
 
 export type OracleKeyStoreKind =

@@ -21,7 +21,7 @@ import {
   type AdminAuthConfig,
 } from './admin-auth.ts';
 import { buildTlsOptions, readTlsEnv } from './tls-options.ts';
-import { InMemoryRateLimiter, clientKey } from './rate-limit.ts';
+import { clientKey, createAuthorityRateLimiter } from './rate-limit.ts';
 import { AuthorityMetrics } from './metrics.ts';
 import { logRequest } from './request-log.ts';
 
@@ -135,12 +135,13 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
   }
 
   const metrics = options.metrics ?? new AuthorityMetrics();
-  const limiter = new InMemoryRateLimiter({
+  const limiter = createAuthorityRateLimiter({
     windowMs:
       options.rateLimit?.windowMs ??
       Number(process.env.TDCP_AUTHORITY_RATE_WINDOW_MS || 60_000),
     maxHits:
       options.rateLimit?.maxHits ?? Number(process.env.TDCP_AUTHORITY_RATE_MAX || 120),
+    dataDir: options.dataDir,
   });
 
   const handler = async (req: IncomingMessage, res: ServerResponse) => {
@@ -234,7 +235,7 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
       }
 
       if (isRateLimitedPath(method, path)) {
-        const rl = limiter.check(`pub:${client}`);
+        const rl = await Promise.resolve(limiter.check(`pub:${client}`));
         if (!rl.allowed) {
           metrics.rateLimited += 1;
           res.writeHead(429, {

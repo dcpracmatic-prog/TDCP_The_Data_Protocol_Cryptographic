@@ -1,10 +1,12 @@
 /**
  * File-backed ECDSA P-256 signing key for Authority durability across restarts.
- * DEVELOPMENT ONLY — extractable JWK on disk. Not HSM/KMS.
+ * Private JWK is encrypted at rest when TDCP_AUTHORITY_KEY_PASSPHRASE is set.
+ * Not HSM / not AWS KMS — local disk only.
  */
 
 import type { OracleKeyStore } from '../../src/oracle/oracle-key-store.ts';
 import type { DurableAuthoritySnapshot } from './durable-store.ts';
+import { DurableJsonAuthorityStore } from './durable-store.ts';
 
 export class DurableFileOracleKeyStore implements OracleKeyStore {
   public readonly kind = 'DEVELOPMENT_IN_MEMORY' as const;
@@ -18,13 +20,28 @@ export class DurableFileOracleKeyStore implements OracleKeyStore {
   private readonly onPersist: (privateJwk: JsonWebKey, publicJwk: JsonWebKey) => void;
 
   constructor(
-    snapshot: Pick<DurableAuthoritySnapshot, 'keyId' | 'signingPrivateJwk' | 'signingPublicJwk'>,
-    onPersist: (privateJwk: JsonWebKey, publicJwk: JsonWebKey) => void
+    snapshot: Pick<
+      DurableAuthoritySnapshot,
+      'keyId' | 'signingPrivateJwk' | 'signingPublicJwk' | 'signingPrivateJwkEnc'
+    >,
+    onPersist: (privateJwk: JsonWebKey, publicJwk: JsonWebKey) => void,
+    store?: DurableJsonAuthorityStore
   ) {
     this.keyId = snapshot.keyId || 'AUTHORITY-KEY-P256-DURABLE-DEV';
-    this.privateJwk = snapshot.signingPrivateJwk;
     this.publicJwk = snapshot.signingPublicJwk;
     this.onPersist = onPersist;
+
+    // Resolve private material (encrypted or plaintext)
+    if (store) {
+      try {
+        this.privateJwk = store.resolvePrivateJwk(snapshot as DurableAuthoritySnapshot);
+      } catch (err) {
+        console.error('[tdcp-authority] Failed to resolve private JWK:', err);
+        this.privateJwk = null;
+      }
+    } else {
+      this.privateJwk = snapshot.signingPrivateJwk;
+    }
   }
 
   public getKeyId(): string {
@@ -55,7 +72,7 @@ export class DurableFileOracleKeyStore implements OracleKeyStore {
 
     this.keyPair = await crypto.subtle.generateKey(
       { name: 'ECDSA', namedCurve: 'P-256' },
-      true, // extractable for durable DEV persistence only
+      true, // extractable for durable persistence only
       ['sign', 'verify']
     );
     this.privateJwk = await crypto.subtle.exportKey('jwk', this.keyPair.privateKey);

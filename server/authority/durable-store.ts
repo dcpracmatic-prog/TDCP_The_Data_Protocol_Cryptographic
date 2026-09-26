@@ -1,11 +1,12 @@
 /**
  * Durable Authority state (JSON files under dataDir).
  *
- * DEVELOPMENT / MVP stub: persists revoke, replay, policies, wrap secrets,
- * and an extractable ECDSA P-256 JWK so restart preserves control-plane state.
+ * Persists revoke, replay, policies, wrap secrets, and signing key material.
+ * Private signing JWK is stored encrypted at rest when TDCP_AUTHORITY_KEY_PASSPHRASE
+ * (or TDCP_AUTHORITY_KEY_FILE) is set — AES-256-GCM, no AWS KMS.
  *
- * HONESTY: This is NOT an HSM/KMS. Production MUST replace signing + wrap-secret
- * storage with HSM/KMS or platform Secure Key Store (see docs/AUTHORITY.md).
+ * HONESTY: This is still not an HSM. Production should prefer non-extractable
+ * platform keys when available; encrypted file is a local hardening step.
  */
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
@@ -13,12 +14,24 @@ import { join } from 'node:path';
 import type { DocumentRevocationState } from '../../src/core/authorization/types.ts';
 import type { RegisteredDocumentPolicy } from '../../src/oracle/authorization-oracle.ts';
 import type { ConsumedOperationRecord } from '../../src/core/replay/replay-cache.ts';
+import type { EncryptedPrivateKeyBlob } from './encrypted-key-store.ts';
+import {
+  decryptPrivateJwk,
+  encryptPrivateJwk,
+  isEncryptedPrivateKeyBlob,
+  readAuthorityKeyPassphrase,
+} from './encrypted-key-store.ts';
 
 export interface DurableAuthoritySnapshot {
   version: 1;
   keyId: string;
-  /** Extractable JWK for development durability only. */
+  /**
+   * Legacy plaintext private JWK (development). Prefer signingPrivateJwkEnc.
+   * Cleared when passphrase is configured and key is re-persisted.
+   */
   signingPrivateJwk: JsonWebKey | null;
+  /** AES-GCM encrypted private JWK blob (preferred at rest). */
+  signingPrivateJwkEnc: EncryptedPrivateKeyBlob | null;
   signingPublicJwk: JsonWebKey | null;
   policies: RegisteredDocumentPolicy[];
   /** documentId → base64 wrap secret */
@@ -33,6 +46,7 @@ const EMPTY: DurableAuthoritySnapshot = {
   version: 1,
   keyId: 'AUTHORITY-KEY-P256-DURABLE-DEV',
   signingPrivateJwk: null,
+  signingPrivateJwkEnc: null,
   signingPublicJwk: null,
   policies: [],
   wrapSecretsBase64: {},
@@ -41,6 +55,11 @@ const EMPTY: DurableAuthoritySnapshot = {
   consumedGrantIds: [],
   activeChallenges: [],
 };
+
+/** Caps to avoid unbounded JSON growth on disk (I/O overflow). */
+const MAX_PERSIST_CONSUMED = 20_000;
+const MAX_PERSIST_CHALLENGES = 5_000;
+const MAX_PERSIST_GRANTS = 20_000;
 
 function atomicWriteJson(path: string, data: unknown): void {
   const tmp = `${path}.tmp`;
@@ -64,17 +83,20 @@ export class DurableJsonAuthorityStore {
     }
     try {
       const raw = readFileSync(this.snapshotPath, 'utf8');
-      const parsed = JSON.parse(raw) as DurableAuthoritySnapshot;
+      const parsed = JSON.parse(raw) as DurableAuthoritySnapshot & {
+        signingPrivateJwkEnc?: EncryptedPrivateKeyBlob | null;
+      };
       if (parsed.version !== 1) return structuredClone(EMPTY);
       return {
         ...structuredClone(EMPTY),
         ...parsed,
+        signingPrivateJwkEnc: parsed.signingPrivateJwkEnc ?? null,
         policies: parsed.policies ?? [],
         wrapSecretsBase64: parsed.wrapSecretsBase64 ?? {},
         revocation: parsed.revocation ?? [],
-        consumedOperations: parsed.consumedOperations ?? [],
-        consumedGrantIds: parsed.consumedGrantIds ?? [],
-        activeChallenges: parsed.activeChallenges ?? [],
+        consumedOperations: (parsed.consumedOperations ?? []).slice(-MAX_PERSIST_CONSUMED),
+        consumedGrantIds: (parsed.consumedGrantIds ?? []).slice(-MAX_PERSIST_GRANTS),
+        activeChallenges: (parsed.activeChallenges ?? []).slice(-MAX_PERSIST_CHALLENGES),
       };
     } catch {
       return structuredClone(EMPTY);
@@ -82,7 +104,57 @@ export class DurableJsonAuthorityStore {
   }
 
   public save(snapshot: DurableAuthoritySnapshot): void {
-    atomicWriteJson(this.snapshotPath, snapshot);
+    const capped: DurableAuthoritySnapshot = {
+      ...snapshot,
+      consumedOperations: snapshot.consumedOperations.slice(-MAX_PERSIST_CONSUMED),
+      consumedGrantIds: snapshot.consumedGrantIds.slice(-MAX_PERSIST_GRANTS),
+      activeChallenges: snapshot.activeChallenges.slice(-MAX_PERSIST_CHALLENGES),
+    };
+    atomicWriteJson(this.snapshotPath, capped);
+  }
+
+  /** Resolve private JWK from encrypted blob or legacy plaintext. */
+  public resolvePrivateJwk(snapshot: DurableAuthoritySnapshot): JsonWebKey | null {
+    const passphrase = readAuthorityKeyPassphrase();
+    if (snapshot.signingPrivateJwkEnc && isEncryptedPrivateKeyBlob(snapshot.signingPrivateJwkEnc)) {
+      if (!passphrase) {
+        throw new Error(
+          'TDCP_AUTHORITY_KEY_PASSPHRASE (or TDCP_AUTHORITY_KEY_FILE) required to decrypt signing key'
+        );
+      }
+      return decryptPrivateJwk(snapshot.signingPrivateJwkEnc, passphrase);
+    }
+    return snapshot.signingPrivateJwk;
+  }
+
+  /**
+   * Persist private key: encrypt when passphrase is set; otherwise plaintext (dev warning).
+   */
+  public sealPrivateJwk(
+    snapshot: DurableAuthoritySnapshot,
+    privateJwk: JsonWebKey,
+    publicJwk: JsonWebKey
+  ): DurableAuthoritySnapshot {
+    const passphrase = readAuthorityKeyPassphrase();
+    if (passphrase) {
+      return {
+        ...snapshot,
+        signingPrivateJwk: null,
+        signingPrivateJwkEnc: encryptPrivateJwk(privateJwk, passphrase),
+        signingPublicJwk: publicJwk,
+      };
+    }
+    if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
+      console.warn(
+        '[tdcp-authority] Signing private JWK stored in plaintext. Set TDCP_AUTHORITY_KEY_PASSPHRASE to encrypt at rest.'
+      );
+    }
+    return {
+      ...snapshot,
+      signingPrivateJwk: privateJwk,
+      signingPrivateJwkEnc: null,
+      signingPublicJwk: publicJwk,
+    };
   }
 
   /** Write a tiny probe file to verify the data dir is writable. */

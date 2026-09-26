@@ -56,9 +56,9 @@ export class DurableAuthorityService {
     const keyStore = createAuthoritySigningKeyStore({
       backend: this.signingBackend,
       snapshot: this.snapshot,
+      store: this.store,
       onPersist: (priv, pub) => {
-        this.snapshot.signingPrivateJwk = priv;
-        this.snapshot.signingPublicJwk = pub;
+        this.snapshot = this.store.sealPrivateJwk(this.snapshot, priv, pub);
         this.persist();
       },
     });
@@ -92,18 +92,10 @@ export class DurableAuthorityService {
       revInternal.documentStates.set(state.documentId, { ...state });
     }
 
-    // Hydrate replay + grants
+    // Hydrate replay + grants (bounded)
     const replay = this.oracle.getReplayRegistry();
-    const replayInternal = replay as unknown as {
-      consumedOperations: Map<string, unknown>;
-      activeChallenges: Map<string, number>;
-    };
-    for (const rec of this.snapshot.consumedOperations) {
-      replayInternal.consumedOperations.set(rec.operationId, rec);
-    }
-    for (const ch of this.snapshot.activeChallenges) {
-      replayInternal.activeChallenges.set(ch.challenge, ch.registeredAt);
-    }
+    replay.hydrateConsumed(this.snapshot.consumedOperations);
+    replay.hydrateActiveChallenges(this.snapshot.activeChallenges);
     const consumed = (this.oracle as unknown as { consumedGrantIds: Set<string> }).consumedGrantIds;
     for (const id of this.snapshot.consumedGrantIds) {
       consumed.add(id);
@@ -121,25 +113,20 @@ export class DurableAuthorityService {
     }
 
     const replay = this.oracle.getReplayRegistry();
-    const replayInternal = replay as unknown as {
-      consumedOperations: Map<string, DurableAuthoritySnapshot['consumedOperations'][number]>;
-      activeChallenges: Map<string, number>;
-    };
     const consumed = (this.oracle as unknown as { consumedGrantIds: Set<string> }).consumedGrantIds;
 
     this.snapshot = {
       version: 1,
       keyId: this.oracle.getKeyId(),
       signingPrivateJwk: this.snapshot.signingPrivateJwk,
+      signingPrivateJwkEnc: this.snapshot.signingPrivateJwkEnc,
       signingPublicJwk: this.snapshot.signingPublicJwk,
       policies: this.oracle.listRegisteredPolicies(),
       wrapSecretsBase64,
       revocation: this.oracle.getRevocationManager().listStates(),
-      consumedOperations: Array.from(replayInternal.consumedOperations.values()),
+      consumedOperations: replay.exportConsumed(),
       consumedGrantIds: Array.from(consumed),
-      activeChallenges: Array.from(replayInternal.activeChallenges.entries()).map(
-        ([challenge, registeredAt]) => ({ challenge, registeredAt })
-      ),
+      activeChallenges: replay.exportActiveChallenges(),
     };
   }
 
