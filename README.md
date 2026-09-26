@@ -1,3 +1,5 @@
+[![CI](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/ci.yml/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/ci.yml)
+
 # TDCP Web — Reference Implementation 2.5
 
 TDCP (The Data Cryptographic Protocol) separates encrypted packages from authorization to operate on them.
