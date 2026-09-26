@@ -92,6 +92,6 @@ Production-hardening options (hosted OIDC JWT and/or mTLS client certs): see **`
 ## Signing backend
 
 - `TDCP_SIGNING_BACKEND=file` (default) — extractable JWK on disk. **Not production-grade.**
-- `TDCP_SIGNING_BACKEND=kms-stub` — documents KMS Sign hook; still local keys; **not** AWS KMS.
+- `TDCP_SIGNING_BACKEND=file` — local JWK (encrypt at rest with `TDCP_AUTHORITY_KEY_PASSPHRASE`). Not HSM. No AWS KMS dependency.
 
 Paid launch blocker: real KMS/HSM signing + reviewed key custody.

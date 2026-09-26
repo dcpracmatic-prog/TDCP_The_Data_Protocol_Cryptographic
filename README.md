@@ -49,7 +49,7 @@ Details: [`MVP.md`](./MVP.md) · Authority: [`docs/AUTHORITY.md`](./docs/AUTHORI
 - Ops: [`docs/OPS.md`](./docs/OPS.md) · Security review pack: [`docs/SECURITY_REVIEW_PACK.md`](./docs/SECURITY_REVIEW_PACK.md)
 - Commercial sketch: [`docs/COMMERCIAL.md`](./docs/COMMERCIAL.md) · Landing copy: [`docs/LANDING_COPY.md`](./docs/LANDING_COPY.md)
 
-**Signing honesty:** `TDCP_SIGNING_BACKEND=file` (default) persists an extractable JWK — **not production-grade**. `kms-stub` documents a KMS Sign hook without AWS credentials — also **not** real KMS.
+**Signing honesty:** `TDCP_SIGNING_BACKEND=file` (default) persists an extractable JWK — **not HSM-grade**. Set `TDCP_AUTHORITY_KEY_PASSPHRASE` to encrypt the private key at rest (AES-256-GCM). No AWS KMS runtime dependency; plug a custom `OracleKeyStore` for real KMS/HSM.
 - Local Authority + web: `./scripts/start-prod-stack.sh` or `docker compose up --build`
 
 

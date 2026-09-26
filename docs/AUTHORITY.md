@@ -130,7 +130,7 @@ See `docs/OPS.md`.
 | `TDCP_SIGNING_BACKEND` | Behavior |
 |------------------------|----------|
 | `file` (default) | Extractable JWK on disk via `DurableFileOracleKeyStore`. **NOT production-grade.** |
-| `kms-stub` | `KmsOracleKeyStore` stub — local key + `signCanonical` hook documenting AWS KMS Sign. **No AWS credentials. NOT production-grade.** |
+| `file` (only) | `DurableFileOracleKeyStore` — private JWK on disk; **encrypt with `TDCP_AUTHORITY_KEY_PASSPHRASE`**. Not HSM. Legacy `kms-stub` env value maps to file. Custom `OracleKeyStore.signCanonical` for real KMS/HSM. |
 
 Production: implement real KMS Sign behind `OracleKeyStore.signCanonical` (see `src/oracle/oracle-key-store.ts`). Clear README note: file JWK is not production-grade.
 

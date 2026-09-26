@@ -6,7 +6,9 @@
  * Env (core):
  *   TDCP_AUTHORITY_PORT (default 8787)
  *   TDCP_AUTHORITY_DATA_DIR (default ./data/authority)
- *   TDCP_SIGNING_BACKEND=file|kms-stub (default file — NOT production-grade)
+ *   TDCP_SIGNING_BACKEND=file (default — extractable JWK; encrypt with TDCP_AUTHORITY_KEY_PASSPHRASE)
+ *   TDCP_AUTHORITY_KEY_PASSPHRASE / TDCP_AUTHORITY_KEY_FILE — AES-GCM at rest for private JWK
+ *   TDCP_AUTHORITY_RATE_MODE=memory|file  TDCP_TRUST_PROXY=0|1
  *
  * Admin auth (see docs/ADMIN_AUTH.md):
  *   TDCP_AUTHORITY_ADMIN_AUTH=token|oidc|mtls|oidc+mtls (default token)
@@ -48,12 +50,6 @@ if (adminAuthMode === 'token') {
 if (tlsEnabled) {
   console.log('[tdcp-authority] TLS enabled' + (adminAuthMode.includes('mtls') ? ' (mTLS client certs required for admin)' : ''));
 }
-if (backend === 'file') {
-  console.log(
-    '[tdcp-authority] WARNING: file JWK signing is NOT production-grade. See docs/AUTHORITY.md'
-  );
-} else {
-  console.log(
-    '[tdcp-authority] kms-stub documents the KMS hook — still NOT a real AWS KMS. See docs/AUTHORITY.md'
-  );
-}
+console.log(
+  '[tdcp-authority] WARNING: file JWK signing is NOT HSM-grade. Set TDCP_AUTHORITY_KEY_PASSPHRASE to encrypt private key at rest. See docs/AUTHORITY.md'
+);
