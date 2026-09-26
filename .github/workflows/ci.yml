@@ -23,6 +23,9 @@ jobs:
           if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
       - name: Test (protocol + auth/app-data + Authority)
+        env:
+          NODE_ENV: test
+          MASTER_KEY_HEX: ${{ secrets.MASTER_KEY_HEX }}
         run: npm test
 
       - name: Typecheck
