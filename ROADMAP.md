@@ -92,6 +92,19 @@ Do **not** change crypto primitives or Gatekeeper security semantics under these
 **Exit criteria:** Operational feel without false HSM claims.  
 **Remaining for paid production:** real KMS/HSM, multi-tenant, ToS/DPA, independent review (see `MVP.md`).
 
+## P7 — CSG + Smart Token free bridge (docs + client stub) — **DONE (MVP)**
+
+**Goal:** Document and stub optional, self-hosted integration with Smart-Token-Prod (long-lived PQ + friction files) and CSG/Sello (integrity seals), without vendoring their trees or bypassing Gatekeeper.
+
+- [x] Design note: `docs/CSG_SMART_TOKEN_BRIDGE.md` (trust planes, free deploy, patterns A/B, non-goals)
+- [x] Minimal TypeScript client: `sdk/typescript/src/smart-token-client.ts` (fetch-only; master request-scoped)
+- [x] Example: `examples/smart-token-bridge-example.ts`
+- [x] PRODUCT / ARCHITECTURE / `.env.example` pointers; optional `SMART_TOKEN_API_URL` / `SMART_TOKEN_API_KEY`
+- [x] **Do not** embed CSG Rust in Node; **do not** change Gatekeeper unlock semantics
+
+**Exit criteria:** Integrators can self-host Smart Token API and call it after Gatekeeper authorization; CSG remains design-time / sidecar attestation.  
+**Remaining:** Optional CSG HTTP sidecar, end-to-end smoke with both services, formal threat-model cross-reference.
+
 ## Explicitly deferred
 
 - Full IRM SaaS parity (Seclore / Virtru / Digify feature race)
@@ -99,3 +112,4 @@ Do **not** change crypto primitives or Gatekeeper security semantics under these
 - Firebase / Gemini in the control plane
 - Formal cryptographic proofs
 - Real HSM/KMS-backed Authority signing (file + kms-stub only today; interface ready)
+- Vendoring Smart-Token-Prod or CSG source into this repository

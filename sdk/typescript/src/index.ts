@@ -1,6 +1,7 @@
 /**
  * @tdcp/sdk — minimal integrator surface.
  * Unlock only via Gatekeeper. See docs/INTEGRATOR_API.md.
+ * Optional Smart Token client: docs/CSG_SMART_TOKEN_BRIDGE.md.
  */
 
 export type {
@@ -34,3 +35,12 @@ export async function unlockViaGatekeeper(
 ): Promise<GatekeeperUnlockResult> {
   return DCPGatekeeper.executeUnlock(options);
 }
+
+export {
+  SmartTokenClient,
+  smartTokenClientFromEnv,
+  type SmartTokenClientOptions,
+  type SmartTokenHealth,
+  type SmartTokenProtectResult,
+  type SmartTokenOpenResult,
+} from './smart-token-client.ts';

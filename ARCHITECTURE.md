@@ -49,6 +49,17 @@ As documented in `README.md` / `AUDIT_2.5.1.md`:
 - ECDSA P-256 (Oracle grants)
 - Web Crypto CSPRNG for nonces/ids
 
+## Optional additive planes (Smart Token + CSG)
+
+When composed with sibling projects (self-hosted, free):
+
+| Plane | Role |
+|-------|------|
+| **Smart Token API** | Long-lived artifact protection (`.stok`); master only in per-request headers; friction is file-borne |
+| **CSG / Sello** | Integrity seals and NotarioProtegido (conatus, structural rupture) on operation events |
+
+These planes **do not** issue TDCP grants or hold wrap secrets. Unlock of TDCP packages remains Gatekeeper-only. Detail: `docs/CSG_SMART_TOKEN_BRIDGE.md`.
+
 ## Non-claims
 
 - A/B/C ULTRA_CRITICAL is **not** threshold secret sharing (not Shamir).
@@ -56,3 +67,4 @@ As documented in `README.md` / `AUDIT_2.5.1.md`:
 - Mock NFC / device / biometric providers are **not** hardware security.
 - Epoch revocation is authoritative only within the current reference runtime until state is persisted remotely.
 - This build is a protocol reference/demo, **not** a declaration of formal cryptographic security or production readiness.
+- Optional Smart Token / CSG bridges are **not** a substitute for Authority revoke/replay or HSM-backed signing.

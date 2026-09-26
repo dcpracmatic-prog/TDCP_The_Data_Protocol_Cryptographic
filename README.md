@@ -36,6 +36,8 @@ npm run smoke:mvp
 
 Details: [`MVP.md`](./MVP.md) · Authority: [`docs/AUTHORITY.md`](./docs/AUTHORITY.md) · Ops: [`docs/OPS.md`](./docs/OPS.md)
 
+**Optional free bridges:** Smart Token Prod (long-lived PQ + friction files) and CSG/Sello (integrity seals) — self-hosted only, Gatekeeper remains sole unlock path. See [`docs/CSG_SMART_TOKEN_BRIDGE.md`](./docs/CSG_SMART_TOKEN_BRIDGE.md).
+
 ---
 
 ## Production launch foundation

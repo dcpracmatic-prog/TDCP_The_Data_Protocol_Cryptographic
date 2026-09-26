@@ -32,6 +32,7 @@ What we sell / build toward (in order):
 2. **Remote Authorization Authority** (next critical milestone)
 3. **Developer / SDK surface** (TypeScript first; Python under `sdk/python` stays a demo sketch)
 4. **Optional bridge to ATL Edge later** — agents unlock only via Gatekeeper (design/docs only; no ATL implementation in this repo)
+5. **Optional free bridges to Smart Token Prod + CSG** — long-lived file defence (PQ + friction) and integrity seals (NotarioProtegido); self-hosted only; Gatekeeper remains the sole unlock path (`docs/CSG_SMART_TOKEN_BRIDGE.md`)
 
 ## ICP
 
@@ -69,6 +70,15 @@ Viability depends on control-plane credibility (remote Authority + review), not 
 ## Relationship to ATL Edge (future)
 
 ATL Edge (or similar agent runtimes) may later unlock TDCP packages **only through the Gatekeeper**, never by holding long-lived content keys in the agent. That bridge is a **design note** (`docs/ATL_EDGE_BRIDGE.md`, ROADMAP P3). This repository does **not** implement ATL Edge code.
+
+## Relationship to Smart Token Prod + CSG (optional, free)
+
+Sibling projects under the same organisation can be composed as **additive planes** without changing TDCP crypto or Gatekeeper semantics:
+
+- **Smart Token Prod** — protect long-lived artifacts (`.stok`) with post-quantum wrap + autonomous friction; call via self-hosted HTTP API after a valid Gatekeeper grant.
+- **CSG / Sello** — integrity attestation and NotarioProtegido (conatus / structural rupture) for operation events.
+
+See `docs/CSG_SMART_TOKEN_BRIDGE.md` and ROADMAP P7. Masters stay operator-scoped; they are never Authority wrap secrets.
 
 ## Success metrics (Authority stub shipped)
 
