@@ -2,6 +2,7 @@
 
 [![Codacy Security Scan](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/codacy.yml/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/codacy.yml)
 
+[![Bearer](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/bearer.yml/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/bearer.yml)
 
 # **TDCP** 
 Web — Reference Implementation 2.5
