@@ -30,6 +30,17 @@ import type { PolicyLevel } from '../core/authorization/types.ts';
 import type { TDCPPackage } from '../core/package/package-format.ts';
 import CollapsibleSection from './CollapsibleSection.tsx';
 import { useUiPrefs } from '../lib/ui-prefs.tsx';
+import {
+  PROTECTION_MODES,
+  getProtectionMode,
+  type ProtectionModeId,
+} from '../protection/protection-modes.ts';
+import { createLocalCsgSeal, type CsgLocalSeal } from '../protection/csg-local-seal.ts';
+import {
+  softSmartTokenProtect,
+  readSmartTokenApiConfig,
+} from '../protection/smart-token-local.ts';
+import { SmartTokenClient } from '../../sdk/typescript/src/smart-token-client.ts';
 
 const POLICY_HELP: Record<PolicyLevel, string> = {
   NORMAL: 'Ventana 5 min. Sin marca forense obligatoria.',
@@ -44,6 +55,8 @@ export default function EncryptPanel() {
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState('');
   const [policyLevel, setPolicyLevel] = useState<PolicyLevel>('STANDARD');
+  const [protectionMode, setProtectionMode] = useState<ProtectionModeId>('tdcp');
+  const modeMeta = useMemo(() => getProtectionMode(protectionMode), [protectionMode]);
   const [daysRestriction, setDaysRestriction] = useState(false);
   const [days, setDays] = useState(5);
   const [watermark, setWatermark] = useState(true);
@@ -67,7 +80,10 @@ export default function EncryptPanel() {
     packageBlob: Blob;
     pkgFileName: string;
     integrityHash: string;
-    pkg: TDCPPackage;
+    pkg: TDCPPackage | null;
+    protectionMode: ProtectionModeId;
+    csgSeal: CsgLocalSeal | null;
+    sealDownloadUrl: string | null;
   } | null>(null);
 
   const { developerMode, addPackageHistory } = useUiPrefs();
@@ -102,8 +118,13 @@ export default function EncryptPanel() {
       setLogs('Error: Debe seleccionar un archivo de origen.');
       return;
     }
-    if (password.length < 8) {
-      setLogs('Error: El factor de contraseña debe tener al menos 8 caracteres. No autoriza por sí sola.');
+    const needsSecret = modeMeta.encrypts || modeMeta.usesSmartToken;
+    if (needsSecret && password.length < 8) {
+      setLogs(
+        modeMeta.usesSmartToken
+          ? 'Error: el master Smart Token debe tener al menos 8 caracteres.'
+          : 'Error: el factor de contraseña debe tener al menos 8 caracteres. No autoriza por sí sola.'
+      );
       return;
     }
 
@@ -112,43 +133,136 @@ export default function EncryptPanel() {
     setCopiedKey(false);
     setCopiedInstructions(false);
     setSharedStatus(null);
-    setLogs('Creando TDCPPackage y registrando política en AuthorizationOracle...');
+    setLogs(`>_ Modo ${modeMeta.short}: ${modeMeta.label}`);
 
     try {
       const plaintext = await file.arrayBuffer();
-      setLogs((prev) => prev + '\n[FACTORY] createTDCPPackage() — única especificación de formato.');
-      setLogs((prev) => prev + '\n[ORACLE] registerDocumentPolicy() — el paquete no contiene autorización.');
+      let packageBlob: Blob;
+      let pkgFileName: string;
+      let integrityHash: string;
+      let monitoringKey = '—';
+      let pkg: TDCPPackage | null = null;
+      let csgSeal: CsgLocalSeal | null = null;
+      const summaryItems: string[] = [`Modo de protección: ${modeMeta.label}`];
 
-      const { pkg, blob, monitoringKey } = await tdcpRuntime.createPackage({
-        plaintext,
-        password,
-        originalFileName: file.name,
-        mimeType: file.type || 'application/octet-stream',
-        policyLevel,
-        allowExtraction,
-        expirationDays: daysRestriction ? days : undefined,
-        viewOnce,
-        watermarkRequired: watermark,
-        blurMode,
-      });
+      if (modeMeta.usesTdcp) {
+        setLogs((prev) => prev + '\n[TDCP] createPackage() + registro de política en Authority/Oracle.');
+        const created = await tdcpRuntime.createPackage({
+          plaintext,
+          password,
+          originalFileName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          policyLevel,
+          allowExtraction,
+          expirationDays: daysRestriction ? days : undefined,
+          viewOnce,
+          watermarkRequired: watermark,
+          blurMode,
+        });
+        pkg = created.pkg;
+        packageBlob = created.blob;
+        monitoringKey = created.monitoringKey;
+        pkgFileName = `TDCP_${file.name.replace(/\.[^/.]+$/, '')}.pkg`;
+        integrityHash = pkg.integrityHash;
+        summaryItems.push(
+          `TDCPPackage ${pkg.version} · AES-256-GCM + HKDF`,
+          `documentId ${pkg.documentId} · packageId ${pkg.packageId}`,
+          `Política ${policyLevel} (no viaja en el archivo)`,
+          'La contraseña sola no descifra. Apertura vía Gatekeeper.'
+        );
+        void addPackageHistory({
+          fileName: file.name,
+          pkgFileName,
+          documentId: pkg.documentId,
+          password,
+        });
+      } else if (modeMeta.usesSmartToken) {
+        setLogs((prev) => prev + '\n[STP] Protección Smart Token…');
+        const api = readSmartTokenApiConfig();
+        if (api) {
+          const client = new SmartTokenClient({
+            baseUrl: api.baseUrl,
+            apiKey: api.apiKey,
+            fetchImpl: globalThis.fetch.bind(globalThis),
+          });
+          const result = await client.protect(file, password, file.name);
+          const envelope = {
+            schema: 'tdcp.stp-remote-ref.v1',
+            artifact_id: result.artifact_id,
+            filename: result.filename ?? file.name,
+            status: result.status,
+            api: api.baseUrl,
+            developmentOnly: false,
+          };
+          packageBlob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
+          pkgFileName = `STP_${file.name.replace(/\.[^/.]+$/, '')}.stok.json`;
+          integrityHash = result.artifact_id;
+          monitoringKey = `STP-${result.artifact_id}`;
+          summaryItems.push(
+            `Smart Token remoto artifact_id=${result.artifact_id}`,
+            `API ${api.baseUrl}`,
+            'Master no se almacena en TDCP; solo en esta operación.'
+          );
+        } else {
+          const soft = await softSmartTokenProtect(
+            plaintext,
+            password,
+            file.name,
+            file.type || 'application/octet-stream'
+          );
+          packageBlob = new Blob([JSON.stringify(soft, null, 2)], { type: 'application/json' });
+          pkgFileName = `STP_${file.name.replace(/\.[^/.]+$/, '')}.soft.stok.json`;
+          integrityHash = soft.artifactId;
+          monitoringKey = `STP-SOFT-${soft.artifactId}`;
+          summaryItems.push(
+            `Soft Smart Token (demo AES-GCM) artifactId=${soft.artifactId}`,
+            soft.note,
+            'Configure VITE_SMART_TOKEN_API_URL para API real ML-KEM.'
+          );
+          void addPackageHistory({
+            fileName: file.name,
+            pkgFileName,
+            documentId: soft.artifactId,
+            password,
+          });
+        }
+      } else {
+        // csg_only: no encryption — package is original bytes
+        packageBlob = new Blob([plaintext], { type: file.type || 'application/octet-stream' });
+        pkgFileName = file.name;
+        integrityHash = 'pending-csg';
+        summaryItems.push(
+          'Sin cifrado: el archivo permanece en claro.',
+          'Solo se adjunta sello de integridad CSG local.'
+        );
+      }
 
-      const blobUrl = URL.createObjectURL(blob);
-      const pkgFileName = `TDCP_${file.name.replace(/\.[^/.]+$/, '')}.pkg`;
+      if (modeMeta.usesCsg) {
+        setLogs((prev) => prev + '\n[CSG] Creando sello de integridad…');
+        const bytes = new Uint8Array(await packageBlob.arrayBuffer());
+        csgSeal = await createLocalCsgSeal(bytes, {
+          label: modeMeta.id,
+          attributes: {
+            mode: modeMeta.id,
+            fileName: file.name,
+            integrityHash: integrityHash.slice(0, 32),
+          },
+        });
+        integrityHash = csgSeal.contentDigest;
+        summaryItems.push(
+          `CSG local sealId=${csgSeal.sealId}`,
+          `digest SHA-256 ${csgSeal.contentDigest.slice(0, 16)}…`,
+          csgSeal.note
+        );
+        setLogs((prev) => prev + `\n[CSG] Sello ${csgSeal.sealId} OK`);
+      }
 
-      const summaryItems = [
-        `Formato TDCPPackage ${pkg.version} · AES-256-GCM + HKDF-SHA256 + AAD`,
-        `documentId ${pkg.documentId} · packageId ${pkg.packageId}`,
-        `Política ${policyLevel} registrada en el Oracle (no viaja en el archivo)`,
-        'CEK aleatoria envuelta con factor de contraseña + secreto Oracle. La contraseña sola no descifra.',
-        allowExtraction
-          ? 'Extracción física permitida sólo con grant EXTRACT.'
-          : 'Extracción física prohibida. Sólo RENDER_RAM en runtime controlado.',
-      ];
-      if (viewOnce) summaryItems.push('Vista única: consumo autoritativo en el Oracle, no en localStorage.');
-      if (daysRestriction) summaryItems.push(`Caducidad de ${days} días según reloj del Oracle.`);
-      if (watermark) summaryItems.push('Marca forense de sesión exigida por política.');
-      if (policyLevel === 'ULTRA_CRITICAL') {
-        summaryItems.push('Fragmentos A/B/C interbloqueados. A, B o C aislados son inútiles.');
+      const blobUrl = URL.createObjectURL(packageBlob);
+      let sealDownloadUrl: string | null = null;
+      if (csgSeal) {
+        sealDownloadUrl = URL.createObjectURL(
+          new Blob([JSON.stringify(csgSeal, null, 2)], { type: 'application/json' })
+        );
       }
 
       setEncryptionResult({
@@ -156,25 +270,21 @@ export default function EncryptPanel() {
         fileName: file.name,
         monitoringKey,
         summary: summaryItems,
-        packageBlob: blob,
+        packageBlob,
         pkgFileName,
-        integrityHash: pkg.integrityHash,
+        integrityHash,
         pkg,
-      });
-
-      void addPackageHistory({
-        fileName: file.name,
-        pkgFileName,
-        documentId: pkg.documentId,
-        password,
+        protectionMode,
+        csgSeal,
+        sealDownloadUrl,
       });
 
       setLogs(
         (prev) =>
           prev +
-          `\n[ÉXITO] TDCPPackage sellado. DOC=${pkg.documentId}` +
-          `\n[ORACLE] Política ${policyLevel} registrada. Copiar este .pkg NO concede autorización.` +
-          `\n[CLAVE] ${monitoringKey} — revocación via epoch, no localStorage.`
+          `\n[ÉXITO] Modo ${modeMeta.short} completado.` +
+          (pkg ? `\n[TDCP] DOC=${pkg.documentId}` : '') +
+          (csgSeal ? `\n[CSG] ${csgSeal.sealId}` : '')
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -209,8 +319,8 @@ export default function EncryptPanel() {
     if (!encryptionResult) return;
     const text = `TDCP PACKAGE (ciphertext only)
 Archivo: ${encryptionResult.pkgFileName}
-documentId: ${encryptionResult.pkg.documentId}
-packageId: ${encryptionResult.pkg.packageId}
+documentId: ${encryptionResult.pkg?.documentId ?? encryptionResult.integrityHash}
+packageId: ${encryptionResult.pkg?.packageId ?? encryptionResult.protectionMode}
 SHA-256 envelope: ${encryptionResult.integrityHash.slice(0, 16)}...
 Plataforma: ${window.location.origin}
 
@@ -245,17 +355,19 @@ La contraseña es un factor adicional, no una llave de apertura.`;
       setSharedStatus(
         `Ciphertext subido a "${selectedFolder.name}". Drive no es autoridad de autorización.`
       );
-      await tdcpRuntime.auditSink.recordEvent({
-        documentId: encryptionResult.pkg.documentId,
-        packageId: encryptionResult.pkg.packageId,
-        deviceId: 'STORAGE',
-        credentialId: 'STORAGE',
-        operationId: `DRIVE-${encryptionResult.pkg.packageId}`,
-        operation: 'CLOUD_SYNC_UPLOAD',
-        policy: encryptionResult.pkg.metadata.policyLevel,
-        result: 'SUCCESS',
-        details: `Paquete cifrado almacenado en Google Drive (carpeta ${selectedFolder.name}). Storage ≠ autorización.`,
-      });
+      if (encryptionResult.pkg) {
+        await tdcpRuntime.auditSink.recordEvent({
+          documentId: encryptionResult.pkg.documentId,
+          packageId: encryptionResult.pkg.packageId,
+          deviceId: 'STORAGE',
+          credentialId: 'STORAGE',
+          operationId: `DRIVE-${encryptionResult.pkg.packageId}`,
+          operation: 'CLOUD_SYNC_UPLOAD',
+          policy: encryptionResult.pkg.metadata.policyLevel,
+          result: 'SUCCESS',
+          details: `Paquete cifrado almacenado en Google Drive (carpeta ${selectedFolder.name}). Storage ≠ autorización.`,
+        });
+      }
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : String(err));
     } finally {
@@ -358,6 +470,15 @@ La contraseña es un factor adicional, no una llave de apertura.`;
                     >
                       <Download className="h-4 w-4" /> Descargar {encryptionResult.pkgFileName}
                     </a>
+                    {encryptionResult.sealDownloadUrl && (
+                      <a
+                        href={encryptionResult.sealDownloadUrl}
+                        download={`${encryptionResult.pkgFileName}.csg.json`}
+                        className="flex w-full items-center justify-center gap-2 rounded-lg border border-cyan-500/50 bg-cyan-500/15 p-2.5 text-center text-[11px] font-bold tracking-wider text-cyan-200 uppercase hover:bg-cyan-500/25"
+                      >
+                        <ShieldCheck className="h-4 w-4" /> Descargar sello CSG
+                      </a>
+                    )}
                     <button
                       onClick={handleNativeShare}
                       className="flex w-full items-center justify-center gap-2 rounded-lg border border-indigo-500/50 bg-indigo-500/20 p-2.5 text-[11px] font-bold tracking-wider text-indigo-300 uppercase hover:bg-indigo-500/30"
@@ -419,8 +540,39 @@ La contraseña es un factor adicional, no una llave de apertura.`;
         <div className="grid w-full grid-cols-1 gap-3 lg:grid-cols-2 lg:items-start">
           <div className="flex flex-col gap-3">
           <CollapsibleSection
+            title="0. Modo de protección"
+            subtitle="TDCP · Smart Token · CSG (opcionales)"
+            accent="cyan"
+            defaultOpen
+          >
+            <div className="space-y-2">
+              <p className="text-[10px] leading-relaxed text-white/50">
+                Elija cifrado TDCP, Smart Token, sello CSG solo, o combinaciones. CSG no cifra; solo atestigua integridad.
+              </p>
+              <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                {PROTECTION_MODES.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setProtectionMode(m.id)}
+                    className={`rounded-lg border px-2.5 py-2 text-left text-[10px] ${
+                      protectionMode === m.id
+                        ? 'border-cyan-500/60 bg-cyan-500/20 text-cyan-100'
+                        : 'border-white/10 bg-black/30 text-white/65 hover:bg-white/5'
+                    }`}
+                  >
+                    <span className="block font-bold tracking-wide uppercase">{m.short}</span>
+                    <span className="mt-0.5 block leading-snug opacity-80">{m.label}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] leading-relaxed text-white/45">{modeMeta.description}</p>
+            </div>
+          </CollapsibleSection>
+
+          <CollapsibleSection
             title="1. Origen y factor"
-            subtitle="Archivo + contraseña — flujo principal"
+            subtitle={modeMeta.usesSmartToken ? 'Archivo + master Smart Token' : modeMeta.encrypts ? 'Archivo + contraseña — flujo principal' : 'Archivo a sellar (sin cifrado)'}
             accent="pink"
             defaultOpen
           >
@@ -512,11 +664,12 @@ La contraseña es un factor adicional, no una llave de apertura.`;
             className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-pink-500/50 bg-pink-500/20 p-3 text-sm font-bold tracking-wider text-pink-400 uppercase shadow-[0_0_20px_rgba(244,114,182,0.1)] hover:bg-pink-500/30 disabled:opacity-50"
           >
             <Lock className="h-4 w-4" />
-            {isEncrypting ? 'Registrando política y sellando...' : 'Crear TDCPPackage y registrar en Oracle'}
+            {isEncrypting ? 'Procesando…' : modeMeta.id === 'csg_only' ? 'Crear sello CSG de integridad' : modeMeta.usesSmartToken ? 'Proteger con Smart Token' : modeMeta.usesCsg ? 'Crear paquete TDCP + sello CSG' : 'Crear TDCPPackage y registrar en Oracle'}
           </button>
           </div>
 
           <div className="flex flex-col gap-3">
+          {modeMeta.usesTdcp && (
           <CollapsibleSection
             title="2. Política"
             subtitle="Nivel Oracle · caducidad · EXTRACT"
@@ -596,6 +749,7 @@ La contraseña es un factor adicional, no una llave de apertura.`;
               </div>
             </div>
           </CollapsibleSection>
+          )}
 
           <CollapsibleSection
             title="Avanzado"

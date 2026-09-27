@@ -46,7 +46,7 @@ export class SmartTokenClient {
     }
     this.baseUrl = options.baseUrl;
     this.apiKey = options.apiKey ?? '';
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
   }
 
   private authHeaders(extra?: Record<string, string>): HeadersInit {
