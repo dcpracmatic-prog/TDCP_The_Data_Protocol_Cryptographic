@@ -240,7 +240,7 @@ export default function EncryptPanel() {
       if (modeMeta.usesCsg) {
         setLogs((prev) => prev + '\n[CSG] Creando sello de integridad…');
         const bytes = new Uint8Array(await packageBlob.arrayBuffer());
-        csgSeal = await createLocalCsgSeal(bytes, {
+        const seal = await createLocalCsgSeal(bytes, {
           label: modeMeta.id,
           attributes: {
             mode: modeMeta.id,
@@ -248,13 +248,14 @@ export default function EncryptPanel() {
             integrityHash: integrityHash.slice(0, 32),
           },
         });
-        integrityHash = csgSeal.contentDigest;
+        csgSeal = seal;
+        integrityHash = seal.contentDigest;
         summaryItems.push(
-          `CSG local sealId=${csgSeal.sealId}`,
-          `digest SHA-256 ${csgSeal.contentDigest.slice(0, 16)}…`,
-          csgSeal.note
+          `CSG local sealId=${seal.sealId}`,
+          `digest SHA-256 ${seal.contentDigest.slice(0, 16)}…`,
+          seal.note
         );
-        setLogs((prev) => prev + `\n[CSG] Sello ${csgSeal.sealId} OK`);
+        setLogs((prev) => prev + `\n[CSG] Sello ${seal.sealId} OK`);
       }
 
       const blobUrl = URL.createObjectURL(packageBlob);
