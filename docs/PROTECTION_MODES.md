@@ -22,3 +22,9 @@ Sin URL se usa **soft Smart Token** (AES-GCM + master, `developmentOnly`).
 Sello local ECDSA-P256 (`tdcp.csg-local.v1`). Producción: sidecar NotarioProtegido (`CSG_SEAL_URL`).
 
 CSG **no cifra**: solo atestigua que el contenido no fue alterado.
+
+## Dual path de apertura (artefacto portátil)
+
+Tras CSG OK: **Ruta A** (USB binding) o **Ruta B** (MFA cuenta). Unwrap en STP API.
+Con HSM `none` el flujo existe en software; claves de alto valor no están en HSM.
+Ver `docs/PORTABLE_ARTIFACT_DUAL_PATH.md` y `docs/SECURITY_DEVICE_MODES.md`.

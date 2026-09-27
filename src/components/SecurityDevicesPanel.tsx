@@ -13,6 +13,7 @@ import {
   DEFAULT_SECURITY_DEVICE_PREFS,
   loadSecurityDevicePrefs,
   saveSecurityDevicePrefs,
+  hsmNoneRiskSummary,
   type CloudHsmVendor,
   type HsmProvider,
   type SecurityDevicePrefs,
@@ -46,16 +47,23 @@ export default function SecurityDevicesPanel() {
   );
 
   const hsmOptions: Array<{ value: HsmProvider; label: string; description: string }> = [
-    { value: 'none', label: 'None', description: 'Sin HSM adicional. Firma file/demo.' },
+    {
+      value: 'none',
+      label: 'None (solo software)',
+      description:
+        'Soberano y funcional: dual path USB|MFA + STP siguen operativos. Claves NO en HSM — valúe el riesgo.',
+    },
     {
       value: 'usb',
       label: 'USB HSM',
-      description: 'Raíz de confianza física (binding + firma soft-USB en demo).',
+      description:
+        'Anclaje en HSM/token USB real del cliente (no pendrive genérico). Mayor aislamiento de claves.',
     },
     {
       value: 'cloud',
       label: 'Cloud HSM',
-      description: 'AWS / Azure / GCP / Vault vía adaptador (SDK real en Authority).',
+      description:
+        'AWS / Azure / GCP / Vault bajo contrato del cliente. Recomendado si el riesgo exige módulo dedicado.',
     },
   ];
 
@@ -206,6 +214,18 @@ export default function SecurityDevicesPanel() {
                 </label>
               ))}
             </div>
+            {prefs.hsmProvider === 'none' && (
+              <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2.5 text-[10px] leading-relaxed text-amber-100/90">
+                <strong className="text-amber-200">Riesgo con HSM = none: </strong>
+                {hsmNoneRiskSummary()}
+              </div>
+            )}
+            <p className="mt-2 text-[10px] leading-relaxed text-white/45">
+              Artefacto portátil: ruta A (USB autorizada + CSG) o ruta B (contraseña + TOTP
+              [+ WebAuthn]). El unwrap depende de la API Smart Token. El dual path{' '}
+              <strong className="text-white/70">funciona sin HSM</strong>; el aislamiento de
+              claves de grado HSM <strong className="text-white/70">no</strong>.
+            </p>
           </div>
 
           {prefs.hsmProvider === 'usb' && (

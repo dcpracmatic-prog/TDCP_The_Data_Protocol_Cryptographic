@@ -95,6 +95,16 @@ export async function softSmartTokenOpen(
   );
 }
 
+export function allowSoftSmartToken(): boolean {
+  const env =
+    typeof import.meta !== 'undefined'
+      ? (import.meta as ImportMeta & { env?: Record<string, string> }).env
+      : undefined;
+  const v = (env?.VITE_TDCP_ALLOW_SOFT_STP ?? '1').trim().toLowerCase();
+  // Default ON for free/demo deploys; set VITE_TDCP_ALLOW_SOFT_STP=0 for pre-prod.
+  return v !== '0' && v !== 'false' && v !== 'no';
+}
+
 export function readSmartTokenApiConfig(): { baseUrl: string; apiKey: string } | null {
   const env =
     typeof import.meta !== 'undefined'

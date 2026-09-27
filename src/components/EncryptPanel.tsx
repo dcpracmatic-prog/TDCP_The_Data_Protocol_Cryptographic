@@ -35,10 +35,16 @@ import {
   getProtectionMode,
   type ProtectionModeId,
 } from '../protection/protection-modes.ts';
-import { createLocalCsgSeal, type CsgLocalSeal } from '../protection/csg-local-seal.ts';
 import {
-  softSmartTokenProtect,
+  createCsgSeal,
+  sealSummary,
+  isRemoteCsgSeal,
+  type CsgSealDocument,
+} from '../protection/csg-seal.ts';
+import {
   readSmartTokenApiConfig,
+  allowSoftSmartToken,
+  softSmartTokenProtect,
 } from '../protection/smart-token-local.ts';
 import { SmartTokenClient } from '../../sdk/typescript/src/smart-token-client.ts';
 
@@ -82,7 +88,7 @@ export default function EncryptPanel() {
     integrityHash: string;
     pkg: TDCPPackage | null;
     protectionMode: ProtectionModeId;
-    csgSeal: CsgLocalSeal | null;
+    csgSeal: CsgSealDocument | null;
     sealDownloadUrl: string | null;
   } | null>(null);
 
@@ -142,7 +148,7 @@ export default function EncryptPanel() {
       let integrityHash: string;
       let monitoringKey = '—';
       let pkg: TDCPPackage | null = null;
-      let csgSeal: CsgLocalSeal | null = null;
+      let csgSeal: CsgSealDocument | null = null;
       const summaryItems: string[] = [`Modo de protección: ${modeMeta.label}`];
 
       if (modeMeta.usesTdcp) {
@@ -177,9 +183,9 @@ export default function EncryptPanel() {
           password,
         });
       } else if (modeMeta.usesSmartToken) {
-        setLogs((prev) => prev + '\n[STP] Protección Smart Token…');
         const api = readSmartTokenApiConfig();
         if (api) {
+          setLogs((prev) => prev + '\n[STP] Protección Smart Token (API confiable)…');
           const client = new SmartTokenClient({
             baseUrl: api.baseUrl,
             apiKey: api.apiKey,
@@ -191,7 +197,6 @@ export default function EncryptPanel() {
             artifact_id: result.artifact_id,
             filename: result.filename ?? file.name,
             status: result.status,
-            api: api.baseUrl,
             developmentOnly: false,
           };
           packageBlob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
@@ -200,10 +205,18 @@ export default function EncryptPanel() {
           monitoringKey = `STP-${result.artifact_id}`;
           summaryItems.push(
             `Smart Token remoto artifact_id=${result.artifact_id}`,
-            `API ${api.baseUrl}`,
-            'Master no se almacena en TDCP; solo en esta operación.'
+            `API confiable (app): ${api.baseUrl}`,
+            'Master no se almacena en TDCP; solo en esta operación.',
+            'Apertura independiente de Gatekeeper (modo Smart Token).'
           );
-        } else {
+          void addPackageHistory({
+            fileName: file.name,
+            pkgFileName,
+            documentId: result.artifact_id,
+            password,
+          });
+        } else if (allowSoftSmartToken()) {
+          setLogs((prev) => prev + '\n[STP] Soft Smart Token (demo AES-GCM; sin API)…');
           const soft = await softSmartTokenProtect(
             plaintext,
             password,
@@ -215,9 +228,9 @@ export default function EncryptPanel() {
           integrityHash = soft.artifactId;
           monitoringKey = `STP-SOFT-${soft.artifactId}`;
           summaryItems.push(
-            `Soft Smart Token (demo AES-GCM) artifactId=${soft.artifactId}`,
+            `Soft Smart Token (demo) artifactId=${soft.artifactId}`,
             soft.note,
-            'Configure VITE_SMART_TOKEN_API_URL para API real ML-KEM.'
+            'Para pre-prod: VITE_SMART_TOKEN_API_URL + VITE_TDCP_ALLOW_SOFT_STP=0'
           );
           void addPackageHistory({
             fileName: file.name,
@@ -225,6 +238,10 @@ export default function EncryptPanel() {
             documentId: soft.artifactId,
             password,
           });
+        } else {
+          throw new Error(
+            'Smart Token requiere VITE_SMART_TOKEN_API_URL (o VITE_TDCP_ALLOW_SOFT_STP=1 para demo local).'
+          );
         }
       } else {
         // csg_only: no encryption — package is original bytes
@@ -238,24 +255,41 @@ export default function EncryptPanel() {
       }
 
       if (modeMeta.usesCsg) {
-        setLogs((prev) => prev + '\n[CSG] Creando sello de integridad…');
-        const bytes = new Uint8Array(await packageBlob.arrayBuffer());
-        const seal = await createLocalCsgSeal(bytes, {
+        setLogs(
+          (prev) =>
+            prev +
+            '\n[CSG] Creando sello de integridad sobre bytes del archivo original (sidecar remoto si VITE_CSG_SEAL_URL)…'
+        );
+        // Always seal the original content bytes (not the packageBlob JSON ref for STP).
+        // On open, verify this seal against recovered plaintext.
+        const sealContent =
+          modeMeta.usesSmartToken || modeMeta.usesTdcp
+            ? new Uint8Array(plaintext)
+            : new Uint8Array(await packageBlob.arrayBuffer());
+        const seal = await createCsgSeal(sealContent, {
           label: modeMeta.id,
           attributes: {
             mode: modeMeta.id,
             fileName: file.name,
             integrityHash: integrityHash.slice(0, 32),
+            sealedOver:
+              modeMeta.usesSmartToken || modeMeta.usesTdcp ? 'original-bytes' : 'package-bytes',
           },
+          proyecto_id: 'tdcp',
         });
         csgSeal = seal;
-        integrityHash = seal.contentDigest;
-        summaryItems.push(
-          `CSG local sealId=${seal.sealId}`,
-          `digest SHA-256 ${seal.contentDigest.slice(0, 16)}…`,
-          seal.note
+        if (isRemoteCsgSeal(seal)) {
+          integrityHash = seal.hash_contenido;
+        } else {
+          integrityHash = seal.contentDigest;
+        }
+        summaryItems.push(...sealSummary(seal));
+        const sealId = isRemoteCsgSeal(seal) ? seal.evento_id : seal.sealId;
+        setLogs(
+          (prev) =>
+            prev +
+            `\n[CSG] Sello ${sealId} OK (${isRemoteCsgSeal(seal) ? 'Notario remoto' : 'local dev'})`
         );
-        setLogs((prev) => prev + `\n[CSG] Sello ${seal.sealId} OK`);
       }
 
       const blobUrl = URL.createObjectURL(packageBlob);
@@ -280,12 +314,17 @@ export default function EncryptPanel() {
         sealDownloadUrl,
       });
 
+      const sealLabel = csgSeal
+        ? isRemoteCsgSeal(csgSeal)
+          ? csgSeal.evento_id
+          : csgSeal.sealId
+        : '';
       setLogs(
         (prev) =>
           prev +
           `\n[ÉXITO] Modo ${modeMeta.short} completado.` +
           (pkg ? `\n[TDCP] DOC=${pkg.documentId}` : '') +
-          (csgSeal ? `\n[CSG] ${csgSeal.sealId}` : '')
+          (csgSeal ? `\n[CSG] ${sealLabel}` : '')
       );
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);

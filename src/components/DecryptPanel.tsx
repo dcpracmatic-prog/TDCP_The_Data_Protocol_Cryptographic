@@ -29,28 +29,57 @@ import type { TDCPPackage } from '../core/package/package-format.ts';
 import type { TDCPRequestedOperation } from '../core/authorization/types.ts';
 import type { ForensicWatermarkData } from '../protection/watermark.ts';
 import type { ControlledRuntimeSession } from '../protection/apoptosis.ts';
+import {
+  readSmartTokenApiConfig,
+  allowSoftSmartToken,
+  softSmartTokenOpen,
+  type SoftSmartTokenArtifact,
+} from '../protection/smart-token-local.ts';
+import { SmartTokenClient } from '../../sdk/typescript/src/smart-token-client.ts';
+import {
+  verifyCsgSeal,
+  type CsgSealDocument,
+} from '../protection/csg-seal.ts';
 
 type ViewerType = 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'download' | 'error';
+
+/** Independent Smart Token mode (does not go through Gatekeeper). */
+type StpRemoteRef = {
+  schema: 'tdcp.stp-remote-ref.v1';
+  artifact_id: string;
+  filename?: string;
+  status?: string;
+  developmentOnly?: boolean;
+};
+
+type ArtifactKind = 'tdcp' | 'smart_token';
 
 export default function DecryptPanel() {
   const { isSignedIn, openFilePicker } = useGoogleAuth();
   const [file, setFile] = useState<File | null>(null);
   const [pkg, setPkg] = useState<TDCPPackage | null>(null);
+  const [stpRef, setStpRef] = useState<StpRemoteRef | null>(null);
+  const [softStok, setSoftStok] = useState<SoftSmartTokenArtifact | null>(null);
+  const [artifactKind, setArtifactKind] = useState<ArtifactKind | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [operation, setOperation] = useState<TDCPRequestedOperation>('RENDER_RAM');
-  const [logs, setLogs] = useState('>_ ESPERANDO PAQUETE TDCP. No hay ruta password → AES.');
+  const [logs, setLogs] = useState(
+    '>_ ESPERANDO artefacto. TDCP .pkg → Gatekeeper obligatorio. Smart Token .stok.json → modo independiente.'
+  );
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [showDriveBrowser, setShowDriveBrowser] = useState(false);
   const [isWindowBlurred, setIsWindowBlurred] = useState(false);
   const [credentialReady, setCredentialReady] = useState(false);
   const [deviceReady, setDeviceReady] = useState(false);
+  const [csgSealFile, setCsgSealFile] = useState<CsgSealDocument | null>(null);
   const [result, setResult] = useState<{
     type: ViewerType;
     content?: string;
     manifesto?: TDCPPackage['metadata'];
     watermark?: ForensicWatermarkData;
     grantId?: string;
+    csgValid?: boolean;
   } | null>(null);
 
   const currentObjectUrlRef = useRef<string | null>(null);
@@ -80,16 +109,71 @@ export default function DecryptPanel() {
   const loadPackage = async (incoming: File) => {
     setFile(incoming);
     setPkg(null);
+    setStpRef(null);
+    setSoftStok(null);
+    setArtifactKind(null);
     setParseError(null);
     setResult(null);
+    setCredentialReady(false);
+    setDeviceReady(false);
     const raw = await incoming.arrayBuffer();
+    const name = (incoming.name || '').toLowerCase();
+
+    // 1) Smart Token remote reference (.stok.json) — independent mode
+    if (name.endsWith('.stok.json') || name.endsWith('.stok')) {
+      try {
+        const text = new TextDecoder().decode(raw);
+        const json = JSON.parse(text) as Partial<StpRemoteRef>;
+        if (json.schema === 'tdcp.stp-remote-ref.v1' && typeof json.artifact_id === 'string') {
+          const ref: StpRemoteRef = {
+            schema: 'tdcp.stp-remote-ref.v1',
+            artifact_id: json.artifact_id,
+            filename: json.filename,
+            status: json.status,
+            developmentOnly: json.developmentOnly,
+          };
+          setStpRef(ref);
+          setArtifactKind('smart_token');
+          setLogs(
+            `Smart Token (modo independiente).\n` +
+              `artifact_id=${ref.artifact_id}\n` +
+              `filename=${ref.filename ?? '—'}\n` +
+              `NO pasa por Gatekeeper. Master se envía solo a la API confiable configurada en la app (VITE_SMART_TOKEN_API_URL).\n` +
+              `Cualquier URL embebida en el JSON se ignora.`
+          );
+          return;
+        }
+        if ((json as { schema?: string }).schema === 'tdcp.soft-stok.v1') {
+          if (!allowSoftSmartToken()) {
+            setParseError(
+              'Soft Smart Token desactivado (VITE_TDCP_ALLOW_SOFT_STP=0). Use API Smart Token real.'
+            );
+            setLogs('Rechazado: soft Smart Token no permitido en esta build.');
+            return;
+          }
+          const soft = json as SoftSmartTokenArtifact;
+          setSoftStok(soft);
+          setArtifactKind('smart_token');
+          setLogs(
+            `Soft Smart Token (demo AES-GCM).\nartifactId=${soft.artifactId}\n` +
+              `NO usa Gatekeeper ni API remota. Solo para free/demo.`
+          );
+          return;
+        }
+      } catch {
+        // fall through to TDCP parse
+      }
+    }
+
+    // 2) TDCP package — Gatekeeper mandatory
     const parsed = await tdcpRuntime.parsePackage(raw);
     if (!parsed.isValidEnvelope || !parsed.package) {
-      setParseError(parsed.error || 'No es un TDCPPackage.');
-      setLogs(`Paquete rechazado: ${parsed.error}`);
+      setParseError(parsed.error || 'No es un TDCPPackage ni un Smart Token .stok.json válido.');
+      setLogs(`Artefacto rechazado: ${parsed.error || 'formato desconocido'}`);
       return;
     }
     setPkg(parsed.package);
+    setArtifactKind('tdcp');
     setLogs(
       `TDCPPackage válido.\nDOC=${parsed.package.documentId}\nPKG=${parsed.package.packageId}\nPOL=${parsed.package.metadata.policyLevel}\nEl archivo no autoriza. Siga: operación → credencial → dispositivo → Gatekeeper.`
     );
@@ -120,8 +204,147 @@ export default function DecryptPanel() {
   };
 
   const processUnlock = async () => {
+    // --- Smart Token independent path ---
+    if (artifactKind === 'smart_token' && softStok) {
+      if (!password || password.length < 8) {
+        setLogs('Error: el master Soft Smart Token debe tener al menos 8 caracteres.');
+        return;
+      }
+      setIsUnlocking(true);
+      setResult(null);
+      try {
+        const plain = await softSmartTokenOpen(softStok, password);
+        let csgValid: boolean | undefined;
+        if (csgSealFile) {
+          const verify = await verifyCsgSeal(plain, csgSealFile);
+          csgValid = verify.valid;
+          setLogs((prev) => prev + `\n[CSG] ${verify.valid ? 'OK' : verify.reason}`);
+        }
+        const bytes = new Uint8Array(plain);
+        let textGuess = '';
+        try {
+          textGuess = new TextDecoder().decode(bytes.slice(0, Math.min(bytes.length, 2000)));
+        } catch {
+          textGuess = '';
+        }
+        const isText = /^[\x09\x0a\x0d\x20-\x7e\u00a0-\uffff]*$/.test(textGuess.slice(0, 200));
+        if (currentObjectUrlRef.current) {
+          URL.revokeObjectURL(currentObjectUrlRef.current);
+          currentObjectUrlRef.current = null;
+        }
+        if (isText) {
+          setResult({ type: 'text', content: new TextDecoder().decode(plain), csgValid });
+        } else {
+          const url = URL.createObjectURL(new Blob([plain]));
+          currentObjectUrlRef.current = url;
+          setResult({ type: 'download', content: url, csgValid });
+        }
+        setLogs((prev) => prev + '\n[STP-SOFT] Abierto en memoria (demo).');
+      } catch (err: unknown) {
+        setLogs((prev) => prev + `\n[STP-SOFT FAIL] ${err instanceof Error ? err.message : String(err)}`);
+        setResult({ type: 'error' });
+      } finally {
+        setIsUnlocking(false);
+      }
+      return;
+    }
+
+    if (artifactKind === 'smart_token' && stpRef) {
+      if (!password || password.length < 8) {
+        setLogs('Error: el master Smart Token debe tener al menos 8 caracteres.');
+        return;
+      }
+      const api = readSmartTokenApiConfig();
+      if (!api) {
+        setLogs(
+          'Error: no hay API Smart Token confiable configurada (VITE_SMART_TOKEN_API_URL). ' +
+            'El master no se envía a ninguna URL embebida en el JSON.'
+        );
+        return;
+      }
+
+      setIsUnlocking(true);
+      if (currentObjectUrlRef.current) {
+        URL.revokeObjectURL(currentObjectUrlRef.current);
+        currentObjectUrlRef.current = null;
+      }
+      setResult(null);
+      setLogs(
+        (prev) =>
+          prev +
+          `\n[STP] Abriendo artifact_id=${stpRef.artifact_id} en API confiable ${api.baseUrl} (modo independiente, sin Gatekeeper).`
+      );
+
+      try {
+        const client = new SmartTokenClient({
+          baseUrl: api.baseUrl,
+          apiKey: api.apiKey,
+          fetchImpl: globalThis.fetch.bind(globalThis),
+        });
+        const openResult = await client.open(stpRef.artifact_id, password);
+        if (!openResult.ok || !openResult.plaintext) {
+          setLogs(
+            (prev) =>
+              prev +
+              `\n[STP DENIED] status=${openResult.status ?? '—'} ${typeof openResult.body === 'string' ? openResult.body : ''}`
+          );
+          return;
+        }
+
+        const fileBinary = openResult.plaintext;
+        let csgValid: boolean | undefined;
+        if (csgSealFile) {
+          const verify = await verifyCsgSeal(new Uint8Array(fileBinary), csgSealFile);
+          csgValid = verify.valid;
+          setLogs(
+            (prev) =>
+              prev +
+              `\n[CSG] Verificación del sello sobre bytes recuperados: ${verify.valid ? 'OK' : verify.reason}`
+          );
+        }
+
+        const fileName = (stpRef.filename || 'artifact.bin').toLowerCase();
+        const fileBlob = new Blob([fileBinary]);
+        const objectUrl = URL.createObjectURL(fileBlob);
+        currentObjectUrlRef.current = objectUrl;
+
+        let type: ViewerType = 'download';
+        let content: string | undefined = objectUrl;
+        if (/\.(jpg|jpeg|png|gif|webp|svg|bmp)$/i.test(fileName)) type = 'image';
+        else if (/\.(mp4|webm|ogv|mov)$/i.test(fileName)) type = 'video';
+        else if (/\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(fileName)) type = 'audio';
+        else if (fileName.endsWith('.pdf')) type = 'pdf';
+        else if (/\.(txt|json|md|csv|xml|js|ts|html|css)$/i.test(fileName)) {
+          type = 'text';
+          content = new TextDecoder().decode(fileBinary);
+        }
+
+        setResult({
+          type,
+          content,
+          manifesto: {
+            originalFileName: stpRef.filename || 'artifact.bin',
+            mimeType: fileBlob.type || 'application/octet-stream',
+          } as TDCPPackage['metadata'],
+          csgValid,
+        });
+        setLogs(
+          (prev) =>
+            prev +
+            `\n[STP OK] ${fileBinary.byteLength} bytes recuperados desde API confiable.` +
+            (csgValid !== undefined ? `\n[CSG] sello=${csgValid ? 'válido' : 'inválido'}` : '')
+        );
+      } catch (err: unknown) {
+        setLogs((prev) => prev + `\n[STP ERROR] ${err instanceof Error ? err.message : String(err)}`);
+      } finally {
+        setIsUnlocking(false);
+      }
+      return;
+    }
+
+    // --- TDCP Gatekeeper path (mandatory for .pkg) ---
     if (!pkg) {
-      setLogs('Error: seleccione un TDCPPackage.');
+      setLogs('Error: seleccione un TDCPPackage (.pkg) o un Smart Token (.stok.json).');
       return;
     }
     if (!credentialReady || !deviceReady) {
@@ -136,7 +359,7 @@ export default function DecryptPanel() {
     }
     sessionRef.current?.terminate('NEW_UNLOCK');
     setResult(null);
-    setLogs((prev) => prev + '\n[GATEKEEPER] DCPGatekeeper.executeUnlock() — único camino de descifrado.');
+    setLogs((prev) => prev + '\n[GATEKEEPER] DCPGatekeeper.executeUnlock() — único camino de descifrado TDCP.');
 
     try {
       const unlock = await tdcpRuntime.unlock({
@@ -224,11 +447,17 @@ export default function DecryptPanel() {
     setResult(null);
     setFile(null);
     setPkg(null);
+    setStpRef(null);
+    setSoftStok(null);
+    setArtifactKind(null);
     setPassword('');
     setCredentialReady(false);
     setDeviceReady(false);
+    setCsgSealFile(null);
     setIsWindowBlurred(false);
-    setLogs('>_ VISOR CERRADO. Sesión terminada (apoptosis).');
+    setLogs(
+      '>_ VISOR CERRADO. Sesión terminada (apoptosis). Esperando TDCP .pkg o Smart Token .stok.json.'
+    );
   };
 
   return (
@@ -236,10 +465,16 @@ export default function DecryptPanel() {
       <div className="glass-panel relative flex min-h-0 flex-1 flex-col overflow-y-auto p-3 md:p-4">
         <div className="mb-2 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="flex items-center gap-2 text-base font-bold text-indigo-400">
-            <Unlock className="h-4 w-4" /> TDCP · Gatekeeper
+            <Unlock className="h-4 w-4" />
+            {artifactKind === 'smart_token'
+              ? 'Smart Token · modo independiente'
+              : 'TDCP · Gatekeeper'}
           </h2>
           <div className="flex w-fit items-center gap-1.5 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-0.5 text-[10px] text-indigo-300">
-            <ShieldCheck className="h-3 w-3" /> Sin bypass de contraseña
+            <ShieldCheck className="h-3 w-3" />
+            {artifactKind === 'smart_token'
+              ? 'Master → API confiable'
+              : 'Sin bypass de contraseña'}
           </div>
         </div>
 
@@ -255,7 +490,9 @@ export default function DecryptPanel() {
               <div className="space-y-3">
                 <div>
                   <div className="mb-1.5 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
-                    <label className="text-[11px] font-bold text-white/50 uppercase">TDCPPackage (.pkg)</label>
+                    <label className="text-[11px] font-bold text-white/50 uppercase">
+                      Artefacto (.pkg TDCP · .stok.json Smart Token)
+                    </label>
                     {isSignedIn && (
                       <div className="flex flex-wrap items-center gap-2">
                         <button
@@ -291,7 +528,7 @@ export default function DecryptPanel() {
                   )}
                   <input
                     type="file"
-                    accept=".pkg,application/octet-stream"
+                    accept=".pkg,.stok.json,.stok,application/json,application/octet-stream"
                     onChange={(e) => {
                       const f = e.target.files?.[0];
                       if (f) void loadPackage(f);
@@ -300,71 +537,132 @@ export default function DecryptPanel() {
                   />
                   {file && pkg && (
                     <div className="mt-2 break-all rounded border border-white/5 bg-black/30 p-2 font-mono text-xs text-indigo-300/80">
-                      {file.name} · {pkg.metadata.policyLevel} · {pkg.documentId}
+                      {file.name} · TDCP · {pkg.metadata.policyLevel} · {pkg.documentId}
+                    </div>
+                  )}
+                  {file && stpRef && (
+                    <div className="mt-2 break-all rounded border border-cyan-500/20 bg-cyan-500/10 p-2 font-mono text-xs text-cyan-300/90">
+                      {file.name} · Smart Token · {stpRef.artifact_id}
                     </div>
                   )}
                   {parseError && <p className="mt-2 text-xs text-rose-400">{parseError}</p>}
-                </div>
 
-                <div>
-                  <label className="mb-1.5 block text-[11px] font-bold text-white/50 uppercase">Operación solicitada</label>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {(['READ', 'RENDER_RAM', 'EXTRACT', 'AUDIT_EXPORT'] as TDCPRequestedOperation[]).map((op) => (
-                      <button
-                        key={op}
-                        type="button"
-                        onClick={() => setOperation(op)}
-                        className={`rounded-lg border px-2 py-1.5 text-[10px] font-bold ${
-                          operation === op
-                            ? 'border-indigo-500/60 bg-indigo-500/20 text-indigo-200'
-                            : 'border-white/10 bg-black/30 text-white/50'
-                        }`}
-                      >
-                        {op}
-                      </button>
-                    ))}
+                  <div className="mt-3">
+                    <label className="mb-1.5 block text-[11px] font-bold text-white/50 uppercase">
+                      Sello CSG opcional (.csg.json / .csg-sello.json)
+                    </label>
+                    <input
+                      type="file"
+                      accept=".json,.csg.json,application/json"
+                      onChange={async (e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) {
+                          setCsgSealFile(null);
+                          return;
+                        }
+                        try {
+                          const text = await f.text();
+                          const json = JSON.parse(text) as CsgSealDocument;
+                          setCsgSealFile(json);
+                          setLogs(
+                            (prev) =>
+                              prev +
+                              `\n[CSG] Sello cargado (${'evento_id' in json ? (json as { evento_id: string }).evento_id : (json as { sealId?: string }).sealId ?? 'ok'})`
+                          );
+                        } catch {
+                          setCsgSealFile(null);
+                          setLogs((prev) => prev + '\n[CSG] No se pudo leer el sello JSON.');
+                        }
+                      }}
+                      className="w-full cursor-pointer text-sm file:mr-4 file:rounded-lg file:border-0 file:bg-cyan-500/20 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-cyan-300"
+                    />
+                    {csgSealFile && (
+                      <p className="mt-1 text-[10px] text-cyan-300/80">
+                        Sello listo — se verificará contra los bytes recuperados al abrir.
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-1.5">
-                  <button
-                    type="button"
-                    onClick={tapCredential}
-                    className={`flex items-center justify-center gap-1.5 rounded-lg border p-2 text-[11px] font-bold ${
-                      credentialReady
-                        ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
-                        : 'border-white/10 bg-white/5 text-white/70'
-                    }`}
-                  >
-                    <CreditCard className="h-3.5 w-3.5" />
-                    {credentialReady ? 'Credencial OK' : 'Credencial NFC'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={bindDevice}
-                    className={`flex items-center justify-center gap-1.5 rounded-lg border p-2 text-[11px] font-bold ${
-                      deviceReady
-                        ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
-                        : 'border-white/10 bg-white/5 text-white/70'
-                    }`}
-                  >
-                    <Cpu className="h-3.5 w-3.5" />
-                    {deviceReady ? 'Dispositivo OK' : 'Dispositivo'}
-                  </button>
-                </div>
+                {artifactKind !== 'smart_token' && (
+                  <>
+                    <div>
+                      <label className="mb-1.5 block text-[11px] font-bold text-white/50 uppercase">Operación solicitada</label>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {(['READ', 'RENDER_RAM', 'EXTRACT', 'AUDIT_EXPORT'] as TDCPRequestedOperation[]).map((op) => (
+                          <button
+                            key={op}
+                            type="button"
+                            onClick={() => setOperation(op)}
+                            className={`rounded-lg border px-2 py-1.5 text-[10px] font-bold ${
+                              operation === op
+                                ? 'border-indigo-500/60 bg-indigo-500/20 text-indigo-200'
+                                : 'border-white/10 bg-black/30 text-white/50'
+                            }`}
+                          >
+                            {op}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1.5">
+                      <button
+                        type="button"
+                        onClick={tapCredential}
+                        className={`flex items-center justify-center gap-1.5 rounded-lg border p-2 text-[11px] font-bold ${
+                          credentialReady
+                            ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+                            : 'border-white/10 bg-white/5 text-white/70'
+                        }`}
+                      >
+                        <CreditCard className="h-3.5 w-3.5" />
+                        {credentialReady ? 'Credencial OK' : 'Credencial NFC'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={bindDevice}
+                        className={`flex items-center justify-center gap-1.5 rounded-lg border p-2 text-[11px] font-bold ${
+                          deviceReady
+                            ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+                            : 'border-white/10 bg-white/5 text-white/70'
+                        }`}
+                      >
+                        <Cpu className="h-3.5 w-3.5" />
+                        {deviceReady ? 'Dispositivo OK' : 'Dispositivo'}
+                      </button>
+                    </div>
+                  </>
+                )}
 
                 <div>
                   <label className="mb-1.5 flex items-center gap-2 text-[11px] font-bold text-white/50 uppercase">
-                    <KeyRound className="h-3.5 w-3.5" /> Factor de contraseña (insuficiente sola)
+                    <KeyRound className="h-3.5 w-3.5" />
+                    {artifactKind === 'smart_token'
+                      ? 'Master Smart Token (request-scoped)'
+                      : 'Factor de contraseña (insuficiente sola)'}
                   </label>
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Factor adicional — el Gatekeeper decide"
+                    placeholder={
+                      artifactKind === 'smart_token'
+                        ? 'Master — solo a API confiable de la app'
+                        : 'Factor adicional — el Gatekeeper decide'
+                    }
                     className="w-full rounded border border-white/10 bg-white/5 p-2.5 font-mono text-sm text-white outline-none focus:border-indigo-500/50"
                   />
                 </div>
+
+                {artifactKind === 'smart_token' && (
+                  <div className="flex items-start gap-2 rounded-lg border border-cyan-500/30 bg-cyan-500/10 p-3 text-[11px] text-cyan-200">
+                    <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                    Modo Smart Token independiente: no usa Gatekeeper. El master se envía únicamente
+                    a la URL configurada en la aplicación (VITE_SMART_TOKEN_API_URL). URLs embebidas
+                    en el JSON se ignoran.
+                  </div>
+                )}
 
                 {pkg && (pkg.metadata.policyLevel === 'CRITICAL' || pkg.metadata.policyLevel === 'ULTRA_CRITICAL') && (
                   <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-200">
@@ -375,12 +673,21 @@ export default function DecryptPanel() {
                 )}
 
                 <button
-                  disabled={isUnlocking || !pkg}
+                  disabled={
+                    isUnlocking ||
+                    (artifactKind === 'smart_token' ? !stpRef : !pkg)
+                  }
                   onClick={processUnlock}
                   className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-indigo-500/50 bg-indigo-500/20 p-3 text-sm font-bold tracking-wider text-indigo-300 uppercase hover:bg-indigo-500/30 disabled:opacity-50"
                 >
                   <Unlock className="h-4 w-4" />
-                  {isUnlocking ? 'Oracle + Gatekeeper...' : 'Solicitar grant y abrir en runtime'}
+                  {isUnlocking
+                    ? artifactKind === 'smart_token'
+                      ? 'Abriendo Smart Token…'
+                      : 'Oracle + Gatekeeper...'
+                    : artifactKind === 'smart_token'
+                      ? 'Abrir Smart Token (API confiable)'
+                      : 'Solicitar grant y abrir en runtime'}
                 </button>
               </div>
             </CollapsibleSection>

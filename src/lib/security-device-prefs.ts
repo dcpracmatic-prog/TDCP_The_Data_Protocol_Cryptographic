@@ -76,3 +76,39 @@ export function saveSecurityDevicePrefs(prefs: SecurityDevicePrefs): void {
     /* quota / private mode */
   }
 }
+
+/**
+ * Assurance level for portable ciphertext + dual-path open (USB | MFA).
+ * With hsmProvider === 'none', wrap keys and high-value ops stay in software:
+ * STP API / browser / file Authority — not a FIPS HSM boundary.
+ */
+export type HsmAssuranceLevel = 'software_only' | 'usb_hsm_path' | 'cloud_hsm_path';
+
+export function hsmAssuranceLevel(provider: HsmProvider): HsmAssuranceLevel {
+  if (provider === 'usb') return 'usb_hsm_path';
+  if (provider === 'cloud') return 'cloud_hsm_path';
+  return 'software_only';
+}
+
+/** User-facing risk copy when HSM is none — dual-path still works, high assurance does not. */
+export function hsmNoneRiskSummary(): string {
+  return (
+    'Con HSM = none el artefacto portátil puede seguir abriéndose por USB autorizada (ruta A) ' +
+    'o por step-up MFA (ruta B: contraseña + TOTP [+ WebAuthn]), y la API Smart Token puede ' +
+    'seguir siendo obligatoria para el unwrap. Eso NO equivale a claves en un módulo HSM: ' +
+    'un compromiso del servidor STP, del proceso del navegador o del almacén de Authority en ' +
+    'software expone material que un HSM USB o Cloud HSM habría aislado. Valore integrar ' +
+    'al menos HSM USB o un servicio Cloud HSM/KMS si el riesgo de su organización lo exige.'
+  );
+}
+
+export function hsmProviderLabel(provider: HsmProvider): string {
+  switch (provider) {
+    case 'usb':
+      return 'USB HSM (ruta de anclaje físico endurecida)';
+    case 'cloud':
+      return 'Cloud HSM / KMS (servicio de nube del cliente)';
+    default:
+      return 'Ninguno (solo software — soberano, menor aislamiento de claves)';
+  }
+}
