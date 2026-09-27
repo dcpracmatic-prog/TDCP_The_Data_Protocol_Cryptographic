@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   Settings,
+  Usb,
 } from 'lucide-react';
 import EncryptPanel from './components/EncryptPanel.tsx';
 import DecryptPanel from './components/DecryptPanel.tsx';
@@ -25,6 +26,7 @@ import { GoogleAuthProvider } from './lib/googleDriveContext.tsx';
 import { AuthProvider, useAuth } from './lib/authContext.tsx';
 import { tdcpRuntime } from './runtime/tdcp-runtime.ts';
 import SettingsPanel from './components/SettingsPanel.tsx';
+import SecurityDevicesPanel from './components/SecurityDevicesPanel.tsx';
 import { UiPrefsProvider } from './lib/ui-prefs.tsx';
 
 function DcpCrystalIcon({ className = 'w-10 h-10' }: { className?: string }) {
@@ -61,7 +63,7 @@ function DcpCrystalIcon({ className = 'w-10 h-10' }: { className?: string }) {
   );
 }
 
-type Tab = 'Decrypt' | 'Encrypt' | 'Monitor' | 'Validate';
+type Tab = 'Decrypt' | 'Encrypt' | 'Monitor' | 'Validate' | 'Devices';
 
 const NAV_ITEMS: Array<{
   name: Tab;
@@ -73,6 +75,12 @@ const NAV_ITEMS: Array<{
   { name: 'Encrypt', label: 'Crear paquete', desc: 'TDCPPackage + Oracle', icon: Lock },
   { name: 'Monitor', label: 'Auditoría', desc: 'Tamper-evident local', icon: Activity },
   { name: 'Validate', label: 'Validación', desc: 'Pruebas reales', icon: FlaskConical },
+  {
+    name: 'Devices',
+    label: 'Hardware & Identidad',
+    desc: 'Gestión de Raíz de Confianza Física (USB Binding), Smart Token y CSG',
+    icon: Usb,
+  },
 ];
 
 function MainDCPApp() {
@@ -353,6 +361,7 @@ function MainDCPApp() {
                 {activeTab === 'Encrypt' && <EncryptPanel />}
                 {activeTab === 'Monitor' && <MonitorPanel />}
                 {activeTab === 'Validate' && <ValidationPanel />}
+                {activeTab === 'Devices' && <SecurityDevicesPanel />}
               </div>
             </div>
           </main>

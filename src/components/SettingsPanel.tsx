@@ -96,6 +96,15 @@ export default function SettingsPanel({ onClose }: { onClose: () => void }) {
           </label>
         </section>
 
+        <section className="mb-5 space-y-2">
+          <h3 className="text-[11px] font-bold tracking-wider text-white/50 uppercase">Hardware & HSM</h3>
+          <p className="text-[10px] leading-relaxed text-white/45">
+            Configure USB Binding, firma USB HSM, anti-replay por hardware y Cloud HSM
+            (AWS / Azure / GCP / Vault) en la pestaña <strong className="text-white/70">Hardware &amp; Identidad</strong>
+            del menú principal. Preferencias en <code className="text-white/60">security-device-prefs</code>.
+          </p>
+        </section>
+
         <section className="space-y-2">
           <h3 className="text-[11px] font-bold tracking-wider text-white/50 uppercase">Datos locales</h3>
           <button

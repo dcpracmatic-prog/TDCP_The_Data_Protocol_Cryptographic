@@ -8,6 +8,8 @@
  *
  * Production: plug HSM / platform Secure Key Store / your KMS via
  * OracleKeyStore (prefer signCanonical when private key is non-exportable).
+ * Multi-cloud: see src/device/cloud-hsm-adapter.ts (aws-kms | azure-keyvault | gcp-kms | hashicorp-vault).
+ * USB soft path: src/device/usb-binding.ts UsbHsmSigningBackend (developmentOnly).
  * This tree does not depend on the AWS SDK. Authority file keys can be
  * encrypted at rest with TDCP_AUTHORITY_KEY_PASSPHRASE (see server/authority).
  */
@@ -16,7 +18,9 @@ export type OracleKeyStoreKind =
   | 'DEVELOPMENT_IN_MEMORY'
   | 'HSM'
   | 'KMS'
-  | 'SECURE_KEY_STORE';
+  | 'SECURE_KEY_STORE'
+  | 'USB_HSM'
+  | 'CLOUD_HSM';
 
 export interface OracleKeyStore {
   readonly kind: OracleKeyStoreKind;
