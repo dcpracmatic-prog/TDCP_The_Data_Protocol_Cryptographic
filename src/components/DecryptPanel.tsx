@@ -20,10 +20,13 @@ import {
   Fingerprint,
   Cpu,
   CreditCard,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { useGoogleAuth } from '../lib/googleDriveContext.tsx';
 import DriveFolderBrowser from './DriveFolderBrowser.tsx';
 import CollapsibleSection from './CollapsibleSection.tsx';
+import { useUiPrefs } from '../lib/ui-prefs.tsx';
 import { tdcpRuntime } from '../runtime/tdcp-runtime.ts';
 import type { TDCPPackage } from '../core/package/package-format.ts';
 import type { TDCPRequestedOperation } from '../core/authorization/types.ts';
@@ -39,6 +42,8 @@ export default function DecryptPanel() {
   const [parseError, setParseError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
   const [operation, setOperation] = useState<TDCPRequestedOperation>('RENDER_RAM');
+  const { developerMode } = useUiPrefs();
+  const [pwdCopied, setPwdCopied] = useState(false);
   const [logs, setLogs] = useState('>_ ESPERANDO PAQUETE TDCP. No hay ruta password → AES.');
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [showDriveBrowser, setShowDriveBrowser] = useState(false);
@@ -353,17 +358,34 @@ export default function DecryptPanel() {
                   </button>
                 </div>
 
-                <div>
+                                <div className="w-full max-w-full">
                   <label className="mb-1.5 flex items-center gap-2 text-[11px] font-bold text-white/50 uppercase">
                     <KeyRound className="h-3.5 w-3.5" /> Factor de contraseña (insuficiente sola)
                   </label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Factor adicional — el Gatekeeper decide"
-                    className="w-full rounded border border-white/10 bg-white/5 p-2.5 font-mono text-sm text-white outline-none focus:border-indigo-500/50"
-                  />
+                  <div className="relative w-full min-w-0">
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Factor adicional — el Gatekeeper decide"
+                      className="w-full min-w-0 rounded border border-white/10 bg-white/5 p-2.5 pr-10 font-mono text-sm text-white outline-none focus:border-indigo-500/50"
+                    />
+                    <button
+                      type="button"
+                      title="Copiar contraseña"
+                      disabled={!password}
+                      onClick={() => {
+                        if (!password) return;
+                        void navigator.clipboard.writeText(password);
+                        setPwdCopied(true);
+                        setTimeout(() => setPwdCopied(false), 2000);
+                      }}
+                      className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-1 text-white/50 hover:bg-white/10 hover:text-white disabled:opacity-30"
+                    >
+                      {pwdCopied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
+                  {pwdCopied && <p className="mt-1 text-[10px] font-semibold text-emerald-400">¡Copiado!</p>}
                 </div>
 
                 {pkg && (pkg.metadata.policyLevel === 'CRITICAL' || pkg.metadata.policyLevel === 'ULTRA_CRITICAL') && (

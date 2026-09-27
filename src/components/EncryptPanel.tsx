@@ -29,6 +29,7 @@ import { tdcpRuntime } from '../runtime/tdcp-runtime.ts';
 import type { PolicyLevel } from '../core/authorization/types.ts';
 import type { TDCPPackage } from '../core/package/package-format.ts';
 import CollapsibleSection from './CollapsibleSection.tsx';
+import { useUiPrefs } from '../lib/ui-prefs.tsx';
 
 const POLICY_HELP: Record<PolicyLevel, string> = {
   NORMAL: 'Ventana 5 min. Sin marca forense obligatoria.',
@@ -69,6 +70,9 @@ export default function EncryptPanel() {
     pkg: TDCPPackage;
   } | null>(null);
 
+  const { developerMode, addPackageHistory } = useUiPrefs();
+  const [pwdCopied, setPwdCopied] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const pwdStrength = useMemo(() => evaluatePasswordStrength(password), [password]);
 
   const generatePassword = () => {
@@ -156,6 +160,13 @@ export default function EncryptPanel() {
         pkgFileName,
         integrityHash: pkg.integrityHash,
         pkg,
+      });
+
+      void addPackageHistory({
+        fileName: file.name,
+        pkgFileName,
+        documentId: pkg.documentId,
+        password,
       });
 
       setLogs(
@@ -440,7 +451,7 @@ La contraseña es un factor adicional, no una llave de apertura.`;
                 />
                 {file && (
                   <div className="mt-3 flex items-center justify-between rounded border border-white/5 bg-black/30 p-2.5 font-mono text-xs text-white/70">
-                    <span className="max-w-[200px] truncate sm:max-w-xs">{file.name}</span>
+                    <span className="min-w-0 max-w-[min(100%,14rem)] truncate sm:max-w-xs">{file.name}</span>
                     <span className="font-mono text-white/40">{(file.size / 1024).toFixed(1)} KB</span>
                   </div>
                 )}
@@ -455,21 +466,41 @@ La contraseña es un factor adicional, no una llave de apertura.`;
                     {pwdStrength.label}
                   </span>
                 </div>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <input
-                    type="text"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Factor adicional de derivación"
-                    className="min-w-0 flex-1 rounded border border-white/10 bg-white/5 p-2.5 font-mono text-sm text-white outline-none focus:border-pink-500/50"
-                  />
+                <div className="flex w-full max-w-full flex-col gap-2 sm:flex-row">
+                  <div className="relative min-w-0 flex-1">
+                    <input
+                      type="text"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Factor adicional de derivación"
+                      className="w-full min-w-0 rounded border border-white/10 bg-white/5 p-2.5 pr-10 font-mono text-sm text-white outline-none focus:border-pink-500/50"
+                    />
+                    <button
+                      type="button"
+                      title="Copiar contraseña"
+                      disabled={!password}
+                      onClick={() => {
+                        if (!password) return;
+                        void navigator.clipboard.writeText(password);
+                        setPwdCopied(true);
+                        setTimeout(() => setPwdCopied(false), 2000);
+                      }}
+                      className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-1 text-white/50 hover:bg-white/10 hover:text-white disabled:opacity-30"
+                    >
+                      {pwdCopied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                  </div>
                   <button
+                    type="button"
                     onClick={generatePassword}
-                    className="flex shrink-0 items-center justify-center gap-1.5 rounded bg-white/10 px-3 py-2.5 text-[11px] font-bold uppercase hover:bg-white/20 sm:py-0"
+                    className="flex w-full shrink-0 items-center justify-center gap-1.5 rounded bg-white/10 px-3 py-2.5 text-[11px] font-bold uppercase hover:bg-white/20 sm:w-auto sm:py-0"
                   >
                     <RefreshCw className="h-3.5 w-3.5" /> Auto
                   </button>
                 </div>
+                {pwdCopied && (
+                  <p className="text-[10px] font-semibold text-emerald-400">¡Copiado!</p>
+                )}
                 <p className="text-[10px] text-white/50">{pwdStrength.feedback}</p>
               </div>
             </div>
@@ -570,7 +601,7 @@ La contraseña es un factor adicional, no una llave de apertura.`;
             title="Avanzado"
             subtitle="Visor · marca forense · formatos"
             accent="indigo"
-            defaultOpen={false}
+            defaultOpen={developerMode}
           >
             <div className="space-y-4">
               <label className="flex items-center gap-2 text-xs font-bold text-white/50 uppercase">

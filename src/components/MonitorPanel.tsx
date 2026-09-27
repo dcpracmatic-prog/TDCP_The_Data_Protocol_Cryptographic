@@ -13,12 +13,14 @@ import {
   Lock,
   Database,
   Clock,
+  KeyRound,
 } from 'lucide-react';
 import { tdcpRuntime, TDCP_AUDIT_UPDATED_EVENT } from '../runtime/tdcp-runtime.ts';
 import type { AuditEvent } from '../audit/audit-event.ts';
 import type { DocumentRevocationState } from '../core/authorization/types.ts';
 import AuthorityOpsStrip from './AuthorityOpsStrip.tsx';
 import CollapsibleSection from './CollapsibleSection.tsx';
+import { useUiPrefs } from '../lib/ui-prefs.tsx';
 
 export default function MonitorPanel() {
   const [activeTab, setActiveTab] = useState<'audit' | 'killswitch'>('audit');
@@ -35,6 +37,11 @@ export default function MonitorPanel() {
     error?: string;
   } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const { history, historyUnlocked, unlockHistory, lockHistory, revealPassword } = useUiPrefs();
+  const [histPin, setHistPin] = useState('');
+  const [histPinError, setHistPinError] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState<Record<string, string>>({});
+  const [copiedHist, setCopiedHist] = useState<string | null>(null);
 
   const load = async () => {
     setAuditLogs(await tdcpRuntime.auditSink.getEvents());
@@ -140,6 +147,113 @@ export default function MonitorPanel() {
           <span className="flex items-center gap-1.5 rounded-full border border-pink-500/30 bg-pink-500/10 px-2 py-0.5 font-mono text-[9px] text-pink-300">
             <Lock className="h-3 w-3" /> no localStorage
           </span>
+        </div>
+
+
+        <div className="mb-2 max-w-full shrink-0">
+        <CollapsibleSection
+          title="Historial de paquetes creados"
+          subtitle="Contraseñas selladas · PIN local (demo)"
+          accent="pink"
+          defaultOpen={false}
+        >
+          <div className="space-y-3">
+            <p className="text-[10px] leading-relaxed text-white/50">
+              Historial en este navegador (AES-GCM + PIN). No es el API Smart Token Prod remoto.
+            </p>
+            {!historyUnlocked ? (
+              <div className="flex w-full max-w-full flex-col gap-2 sm:flex-row">
+                <input
+                  type="password"
+                  value={histPin}
+                  onChange={(e) => setHistPin(e.target.value)}
+                  placeholder="PIN / clave local"
+                  className="min-w-0 flex-1 rounded border border-white/10 bg-white/5 px-3 py-2 font-mono text-xs text-white outline-none focus:border-pink-500/50"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setHistPinError(null);
+                    const ok = await unlockHistory(histPin.trim() || 'tdcp-demo-pin');
+                    if (!ok) setHistPinError('PIN incorrecto');
+                    else setHistPin('');
+                  }}
+                  className="flex w-full shrink-0 items-center justify-center gap-1.5 rounded-lg border border-pink-500/40 bg-pink-500/15 px-3 py-2 text-[11px] font-bold text-pink-200 uppercase hover:bg-pink-500/25 sm:w-auto"
+                >
+                  <KeyRound className="h-3.5 w-3.5" /> Desbloquear
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold text-emerald-400">Historial desbloqueado</span>
+                <button
+                  type="button"
+                  onClick={() => { lockHistory(); setRevealed({}); }}
+                  className="rounded border border-white/10 px-2 py-1 text-[10px] text-white/60 hover:bg-white/5"
+                >
+                  Bloquear
+                </button>
+              </div>
+            )}
+            {histPinError && <p className="text-[10px] text-red-300">{histPinError}</p>}
+            {history.length === 0 ? (
+              <p className="text-[11px] text-white/40">Aún no hay paquetes creados en este dispositivo.</p>
+            ) : (
+              <ul className="max-h-64 space-y-2 overflow-y-auto [-webkit-overflow-scrolling:touch]">
+                {history.map((h) => (
+                  <li key={h.id} className="rounded-lg border border-white/10 bg-black/30 p-2.5 text-[11px]">
+                    <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-bold text-white">{h.pkgFileName}</div>
+                        <div className="truncate text-white/40">{h.fileName}</div>
+                        <div className="mt-0.5 font-mono text-[10px] text-white/35">
+                          {new Date(h.createdAt).toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <span className="font-mono text-white/70">
+                          {historyUnlocked && revealed[h.id] ? revealed[h.id] : '••••••••'}
+                        </span>
+                        {historyUnlocked && (
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] text-white/60 hover:bg-white/10"
+                              onClick={async () => {
+                                if (revealed[h.id]) {
+                                  setRevealed((r) => { const n = { ...r }; delete n[h.id]; return n; });
+                                  return;
+                                }
+                                const pw = await revealPassword(h.id);
+                                if (pw) setRevealed((r) => ({ ...r, [h.id]: pw }));
+                              }}
+                            >
+                              {revealed[h.id] ? 'Ocultar' : 'Ver'}
+                            </button>
+                            <button
+                              type="button"
+                              className="rounded bg-white/5 px-1.5 py-0.5 text-[9px] text-white/60 hover:bg-white/10"
+                              onClick={async () => {
+                                let pw = revealed[h.id];
+                                if (!pw) pw = (await revealPassword(h.id)) || '';
+                                if (!pw) return;
+                                void navigator.clipboard.writeText(pw);
+                                setCopiedHist(h.id);
+                                setTimeout(() => setCopiedHist(null), 1500);
+                              }}
+                            >
+                              {copiedHist === h.id ? 'OK' : 'Copiar'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </CollapsibleSection>
         </div>
 
         <div className="mb-2 grid shrink-0 grid-cols-1 gap-2 lg:grid-cols-2">

@@ -11,6 +11,7 @@ import {
   FlaskConical,
   Menu,
   X,
+  Settings,
 } from 'lucide-react';
 import EncryptPanel from './components/EncryptPanel.tsx';
 import DecryptPanel from './components/DecryptPanel.tsx';
@@ -23,6 +24,8 @@ import CollapsibleSection from './components/CollapsibleSection.tsx';
 import { GoogleAuthProvider } from './lib/googleDriveContext.tsx';
 import { AuthProvider, useAuth } from './lib/authContext.tsx';
 import { tdcpRuntime } from './runtime/tdcp-runtime.ts';
+import SettingsPanel from './components/SettingsPanel.tsx';
+import { UiPrefsProvider } from './lib/ui-prefs.tsx';
 
 function DcpCrystalIcon({ className = 'w-10 h-10' }: { className?: string }) {
   return (
@@ -80,14 +83,30 @@ function MainDCPApp() {
   const menuRef = useRef<HTMLDivElement>(null);
   const providers = tdcpRuntime.getProviderStatus();
 
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   useEffect(() => {
-    if (!menuOpen) return;
+    const lock = menuOpen || settingsOpen;
+    if (lock) {
+      const prev = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prev;
+      };
+    }
+  }, [menuOpen, settingsOpen]);
+
+  useEffect(() => {
+    if (!menuOpen && !settingsOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false);
+      if (e.key === 'Escape') {
+        setMenuOpen(false);
+        setSettingsOpen(false);
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [menuOpen]);
+  }, [menuOpen, settingsOpen]);
 
   if (isLoading) {
     return (
@@ -291,6 +310,16 @@ function MainDCPApp() {
                 </div>
                 <button
                   type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setSettingsOpen(true);
+                  }}
+                  className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-4 py-2.5 text-xs font-bold tracking-wider text-white/80 uppercase hover:bg-white/10"
+                >
+                  <Settings className="h-3.5 w-3.5" /> Configuración
+                </button>
+                <button
+                  type="button"
                   onClick={logout}
                   className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs font-bold tracking-wider text-red-300 uppercase hover:bg-red-500/20"
                 >
@@ -308,7 +337,7 @@ function MainDCPApp() {
         <div className="mx-2 mt-2 mb-2 flex min-h-0 flex-1 flex-col overflow-hidden md:mx-4 md:mb-3 md:mt-3">
           <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <AuthorityStatusBar />
-            <div className="mb-2 shrink-0">
+            <div className="mb-2 max-w-full shrink-0 md:mb-2">
               <CollapsibleSection
                 title="Almacenamiento"
                 subtitle="Google Drive · carpetas compartidas"
@@ -318,7 +347,7 @@ function MainDCPApp() {
                 <GoogleDriveBar />
               </CollapsibleSection>
             </div>
-            <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto">
+            <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-y-contain pb-[max(0.5rem,env(safe-area-inset-bottom))] [-webkit-overflow-scrolling:touch]">
               <div className="flex min-h-0 w-full flex-1 flex-col">
                 {activeTab === 'Decrypt' && <DecryptPanel />}
                 {activeTab === 'Encrypt' && <EncryptPanel />}
@@ -329,16 +358,19 @@ function MainDCPApp() {
           </main>
         </div>
       </div>
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
     </>
   );
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <GoogleAuthProvider>
-        <MainDCPApp />
-      </GoogleAuthProvider>
-    </AuthProvider>
+    <UiPrefsProvider>
+      <AuthProvider>
+        <GoogleAuthProvider>
+          <MainDCPApp />
+        </GoogleAuthProvider>
+      </AuthProvider>
+    </UiPrefsProvider>
   );
 }
