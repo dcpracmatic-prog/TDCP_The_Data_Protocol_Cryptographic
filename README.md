@@ -1,8 +1,7 @@
 [![CI](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/ci.yml/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/ci.yml)
-
 [![Codacy Security Scan](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/codacy.yml/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/codacy.yml)
-
 [![Bearer](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/bearer.yml/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/bearer.yml)
+[![CodeQL Advanced](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/codeql.yml/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/codeql.yml)
 
 # **TDCP** 
 Web — Reference Implementation 2.5
