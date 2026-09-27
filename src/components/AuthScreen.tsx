@@ -208,33 +208,12 @@ export default function AuthScreen() {
         }}
       >
         {/* Brand Header */}
-        <div 
-          className="flex flex-col items-center text-center mb-6 border-white/20"
-          style={{
-            height: '130px',
-            borderRadius: '45px',
-            borderStyle: 'inset',
-            borderWidth: '1px'
-          }}
-        >
-          <DcpCrystalIcon className="w-14 h-14 mb-3" svgStyle={{ marginLeft: '-200px', marginTop: '14px' }} />
-          <h1 
-            className="text-2xl font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-pink-300 via-purple-300 to-indigo-300"
-            style={{
-              marginLeft: '50px',
-              marginRight: '0px',
-              marginTop: '-49px'
-            }}
-          >
+        <div className="mb-6 flex flex-col items-center text-center">
+          <DcpCrystalIcon className="mb-3 h-14 w-14" />
+          <h1 className="bg-gradient-to-r from-pink-300 via-purple-300 to-indigo-300 bg-clip-text text-2xl font-black tracking-wider text-transparent">
             DCP SECURE
           </h1>
-          <p 
-            className="text-[10px] uppercase tracking-widest text-white/50 font-bold"
-            style={{
-              marginTop: '15px',
-              marginLeft: '0px'
-            }}
-          >
+          <p className="mt-2 text-[10px] font-bold tracking-widest text-white/50 uppercase">
             The Data Cryptographic Protocol
           </p>
           <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-[10px] text-purple-300">

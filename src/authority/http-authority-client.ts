@@ -51,7 +51,8 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
 
   constructor(options: HttpAuthorityClientOptions) {
     this.baseUrl = options.baseUrl.replace(/\/$/, '');
-    this.fetchImpl = options.fetchImpl ?? fetch;
+    // Bind to globalThis — unbound fetch throws Illegal invocation in some browsers/bundles
+    this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.adminToken = options.adminToken;
   }
 
