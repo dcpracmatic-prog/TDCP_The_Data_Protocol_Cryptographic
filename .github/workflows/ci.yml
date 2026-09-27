@@ -31,17 +31,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
         
-      - name: 'notify vercel'
-        uses: 'vercel/repository-dispatch/actions/status@v1'
-        with:
-        name: Vercel - tdcp: tdcp
-    
       - name: Build
         run: npm run build
         env:
           VITE_AUTH_ENABLED: "false"
 
-      # App Builder harness tests under scripts/** expect optional .grok skill trees;
       # they are not required for the TDCP protocol gate. Run informatively.
       - name: Script harness tests (informational)
         continue-on-error: true
