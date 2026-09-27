@@ -31,11 +31,8 @@ import type { ForensicWatermarkData } from '../protection/watermark.ts';
 import type { ControlledRuntimeSession } from '../protection/apoptosis.ts';
 import {
   readSmartTokenApiConfig,
-  allowSoftSmartToken,
-  softSmartTokenOpen,
-  type SoftSmartTokenArtifact,
+  requireSmartTokenClient,
 } from '../protection/smart-token-local.ts';
-import { SmartTokenClient } from '../../sdk/typescript/src/smart-token-client.ts';
 import {
   verifyCsgSeal,
   type CsgSealDocument,
@@ -59,7 +56,6 @@ export default function DecryptPanel() {
   const [file, setFile] = useState<File | null>(null);
   const [pkg, setPkg] = useState<TDCPPackage | null>(null);
   const [stpRef, setStpRef] = useState<StpRemoteRef | null>(null);
-  const [softStok, setSoftStok] = useState<SoftSmartTokenArtifact | null>(null);
   const [artifactKind, setArtifactKind] = useState<ArtifactKind | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
@@ -110,7 +106,6 @@ export default function DecryptPanel() {
     setFile(incoming);
     setPkg(null);
     setStpRef(null);
-    setSoftStok(null);
     setArtifactKind(null);
     setParseError(null);
     setResult(null);
@@ -144,20 +139,10 @@ export default function DecryptPanel() {
           return;
         }
         if ((json as { schema?: string }).schema === 'tdcp.soft-stok.v1') {
-          if (!allowSoftSmartToken()) {
-            setParseError(
-              'Soft Smart Token desactivado (VITE_TDCP_ALLOW_SOFT_STP=0). Use API Smart Token real.'
-            );
-            setLogs('Rechazado: soft Smart Token no permitido en esta build.');
-            return;
-          }
-          const soft = json as SoftSmartTokenArtifact;
-          setSoftStok(soft);
-          setArtifactKind('smart_token');
-          setLogs(
-            `Soft Smart Token (demo AES-GCM).\nartifactId=${soft.artifactId}\n` +
-              `NO usa Gatekeeper ni API remota. Solo para free/demo.`
+          setParseError(
+            'Artefacto soft/demo Smart Token no admitido en pre-producción. Use un .stok.json emitido por la API Smart-Token-Prod.'
           );
+          setLogs('Rechazado: soft Smart Token eliminado del flujo TDCP.');
           return;
         }
       } catch {
@@ -205,63 +190,19 @@ export default function DecryptPanel() {
 
   const processUnlock = async () => {
     // --- Smart Token independent path ---
-    if (artifactKind === 'smart_token' && softStok) {
-      if (!password || password.length < 8) {
-        setLogs('Error: el master Soft Smart Token debe tener al menos 8 caracteres.');
-        return;
-      }
-      setIsUnlocking(true);
-      setResult(null);
-      try {
-        const plain = await softSmartTokenOpen(softStok, password);
-        let csgValid: boolean | undefined;
-        if (csgSealFile) {
-          const verify = await verifyCsgSeal(plain, csgSealFile);
-          csgValid = verify.valid;
-          setLogs((prev) => prev + `\n[CSG] ${verify.valid ? 'OK' : verify.reason}`);
-        }
-        const bytes = new Uint8Array(plain);
-        let textGuess = '';
-        try {
-          textGuess = new TextDecoder().decode(bytes.slice(0, Math.min(bytes.length, 2000)));
-        } catch {
-          textGuess = '';
-        }
-        const isText = /^[\x09\x0a\x0d\x20-\x7e\u00a0-\uffff]*$/.test(textGuess.slice(0, 200));
-        if (currentObjectUrlRef.current) {
-          URL.revokeObjectURL(currentObjectUrlRef.current);
-          currentObjectUrlRef.current = null;
-        }
-        if (isText) {
-          setResult({ type: 'text', content: new TextDecoder().decode(plain), csgValid });
-        } else {
-          const url = URL.createObjectURL(new Blob([plain]));
-          currentObjectUrlRef.current = url;
-          setResult({ type: 'download', content: url, csgValid });
-        }
-        setLogs((prev) => prev + '\n[STP-SOFT] Abierto en memoria (demo).');
-      } catch (err: unknown) {
-        setLogs((prev) => prev + `\n[STP-SOFT FAIL] ${err instanceof Error ? err.message : String(err)}`);
-        setResult({ type: 'error' });
-      } finally {
-        setIsUnlocking(false);
-      }
-      return;
-    }
-
     if (artifactKind === 'smart_token' && stpRef) {
       if (!password || password.length < 8) {
         setLogs('Error: el master Smart Token debe tener al menos 8 caracteres.');
         return;
       }
-      const api = readSmartTokenApiConfig();
-      if (!api) {
-        setLogs(
-          'Error: no hay API Smart Token confiable configurada (VITE_SMART_TOKEN_API_URL). ' +
-            'El master no se envía a ninguna URL embebida en el JSON.'
-        );
+      let client;
+      try {
+        client = requireSmartTokenClient();
+      } catch (err: unknown) {
+        setLogs(err instanceof Error ? err.message : String(err));
         return;
       }
+      const api = readSmartTokenApiConfig()!;
 
       setIsUnlocking(true);
       if (currentObjectUrlRef.current) {
@@ -276,11 +217,6 @@ export default function DecryptPanel() {
       );
 
       try {
-        const client = new SmartTokenClient({
-          baseUrl: api.baseUrl,
-          apiKey: api.apiKey,
-          fetchImpl: globalThis.fetch.bind(globalThis),
-        });
         const openResult = await client.open(stpRef.artifact_id, password);
         if (!openResult.ok || !openResult.plaintext) {
           setLogs(
@@ -448,7 +384,6 @@ export default function DecryptPanel() {
     setFile(null);
     setPkg(null);
     setStpRef(null);
-    setSoftStok(null);
     setArtifactKind(null);
     setPassword('');
     setCredentialReady(false);

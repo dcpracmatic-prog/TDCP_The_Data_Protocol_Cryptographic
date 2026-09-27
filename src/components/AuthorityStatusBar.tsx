@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Activity, Wifi, WifiOff } from 'lucide-react';
 import { readAuthorityUrlFromEnv } from '../authority/resolve-authority.ts';
 import { tdcpRuntime } from '../runtime/tdcp-runtime.ts';
+import { probeSmartTokenHealth } from '../protection/smart-token-local.ts';
 
 type HealthState = 'checking' | 'connected' | 'offline' | 'in-process';
 
@@ -118,6 +119,63 @@ export function AuthorityStatusChip({ className = '' }: { className?: string }) 
   );
 }
 
+
+/** Chip: Smart-Token-Prod API (isolated repo) connectivity. */
+export function SmartTokenStatusChip({ className = '' }: { className?: string }) {
+  const [label, setLabel] = useState('STP…');
+  const [tone, setTone] = useState<'ok' | 'warn' | 'bad' | 'off'>('warn');
+
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      const h = await probeSmartTokenHealth();
+      if (cancelled) return;
+      if (!h.configured) {
+        setLabel('STP not configured');
+        setTone('off');
+        return;
+      }
+      if (!h.reachable) {
+        setLabel('STP offline');
+        setTone('bad');
+        return;
+      }
+      if (h.smartTokenAvailable === false) {
+        setLabel('STP crypto down');
+        setTone('bad');
+        return;
+      }
+      setLabel('STP connected');
+      setTone('ok');
+    };
+    void tick();
+    const id = window.setInterval(() => void tick(), 8000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, []);
+
+  const toneClass =
+    tone === 'ok'
+      ? 'border-cyan-500/40 bg-cyan-500/15 text-cyan-100'
+      : tone === 'bad'
+        ? 'border-red-500/40 bg-red-500/15 text-red-200'
+        : tone === 'off'
+          ? 'border-white/15 bg-white/5 text-white/45'
+          : 'border-amber-500/40 bg-amber-500/15 text-amber-100';
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[10px] font-bold tracking-wide uppercase ${toneClass} ${className}`}
+      title="Smart-Token-Prod API (VITE_SMART_TOKEN_API_URL)"
+    >
+      {tone === 'ok' ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+      {label}
+    </span>
+  );
+}
+
 /** Always-visible MVP / Authority honesty banner + connection chip. */
 export function AuthorityStatusBar() {
   const health = useAuthorityHealth();
@@ -144,7 +202,8 @@ export function AuthorityStatusBar() {
       >
         {bannerText}
       </p>
-      <div className="hidden shrink-0 sm:block">
+      <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
+        <SmartTokenStatusChip />
         <AuthorityStatusChip />
       </div>
     </div>

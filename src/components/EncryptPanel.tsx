@@ -41,12 +41,7 @@ import {
   isRemoteCsgSeal,
   type CsgSealDocument,
 } from '../protection/csg-seal.ts';
-import {
-  readSmartTokenApiConfig,
-  allowSoftSmartToken,
-  softSmartTokenProtect,
-} from '../protection/smart-token-local.ts';
-import { SmartTokenClient } from '../../sdk/typescript/src/smart-token-client.ts';
+import { requireSmartTokenClient } from '../protection/smart-token-local.ts';
 
 const POLICY_HELP: Record<PolicyLevel, string> = {
   NORMAL: 'Ventana 5 min. Sin marca forense obligatoria.',
@@ -183,67 +178,45 @@ export default function EncryptPanel() {
           password,
         });
       } else if (modeMeta.usesSmartToken) {
-        const api = readSmartTokenApiConfig();
-        if (api) {
-          setLogs((prev) => prev + '\n[STP] Protección Smart Token (API confiable)…');
-          const client = new SmartTokenClient({
-            baseUrl: api.baseUrl,
-            apiKey: api.apiKey,
-            fetchImpl: globalThis.fetch.bind(globalThis),
-          });
-          const result = await client.protect(file, password, file.name);
-          const envelope = {
-            schema: 'tdcp.stp-remote-ref.v1',
-            artifact_id: result.artifact_id,
-            filename: result.filename ?? file.name,
-            status: result.status,
-            developmentOnly: false,
-          };
-          packageBlob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
-          pkgFileName = `STP_${file.name.replace(/\.[^/.]+$/, '')}.stok.json`;
-          integrityHash = result.artifact_id;
-          monitoringKey = `STP-${result.artifact_id}`;
-          summaryItems.push(
-            `Smart Token remoto artifact_id=${result.artifact_id}`,
-            `API confiable (app): ${api.baseUrl}`,
-            'Master no se almacena en TDCP; solo en esta operación.',
-            'Apertura independiente de Gatekeeper (modo Smart Token).'
-          );
-          void addPackageHistory({
-            fileName: file.name,
-            pkgFileName,
-            documentId: result.artifact_id,
-            password,
-          });
-        } else if (allowSoftSmartToken()) {
-          setLogs((prev) => prev + '\n[STP] Soft Smart Token (demo AES-GCM; sin API)…');
-          const soft = await softSmartTokenProtect(
-            plaintext,
-            password,
-            file.name,
-            file.type || 'application/octet-stream'
-          );
-          packageBlob = new Blob([JSON.stringify(soft, null, 2)], { type: 'application/json' });
-          pkgFileName = `STP_${file.name.replace(/\.[^/.]+$/, '')}.soft.stok.json`;
-          integrityHash = soft.artifactId;
-          monitoringKey = `STP-SOFT-${soft.artifactId}`;
-          summaryItems.push(
-            `Soft Smart Token (demo) artifactId=${soft.artifactId}`,
-            soft.note,
-            'Para pre-prod: VITE_SMART_TOKEN_API_URL + VITE_TDCP_ALLOW_SOFT_STP=0'
-          );
-          void addPackageHistory({
-            fileName: file.name,
-            pkgFileName,
-            documentId: soft.artifactId,
-            password,
-          });
-        } else {
+        setLogs((prev) => prev + '\n[STP] Protección vía Smart-Token-Prod API (pre-prod)…');
+        const client = requireSmartTokenClient();
+        const health = await client.healthz();
+        if (health.smart_token_available === false) {
           throw new Error(
-            'Smart Token requiere VITE_SMART_TOKEN_API_URL (o VITE_TDCP_ALLOW_SOFT_STP=1 para demo local).'
+            'Smart Token API respondió healthz pero el stack crypto no está disponible (smart_token_available=false).'
           );
         }
-      } else {
+        setLogs(
+          (prev) =>
+            prev +
+            `\n[STP] API OK storage=${health.storage_backend ?? '—'} available=${String(health.smart_token_available)}`
+        );
+        const result = await client.protect(file, password, file.name);
+        const envelope = {
+          schema: 'tdcp.stp-remote-ref.v1' as const,
+          artifact_id: result.artifact_id,
+          filename: result.filename ?? file.name,
+          status: result.status,
+          developmentOnly: false,
+          protocol: 'smart-token-prod',
+        };
+        packageBlob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
+        pkgFileName = `STP_${file.name.replace(/\.[^/.]+$/, '')}.stok.json`;
+        integrityHash = result.artifact_id;
+        monitoringKey = `STP-${result.artifact_id}`;
+        summaryItems.push(
+          `Smart Token artifact_id=${result.artifact_id}`,
+          `status=${result.status}`,
+          'Master request-scoped (header X-Smart-Token-Master); TDCP no lo persiste.',
+          'Apertura independiente del Gatekeeper TDCP — solo API confiable de la app.'
+        );
+        void addPackageHistory({
+          fileName: file.name,
+          pkgFileName,
+          documentId: result.artifact_id,
+          password,
+        });
+            } else {
         // csg_only: no encryption — package is original bytes
         packageBlob = new Blob([plaintext], { type: file.type || 'application/octet-stream' });
         pkgFileName = file.name;

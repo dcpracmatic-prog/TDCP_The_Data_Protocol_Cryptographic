@@ -49,7 +49,7 @@ export const PROTECTION_MODES: ProtectionModeOption[] = [
     label: 'Smart Token',
     short: 'STP',
     description:
-      'Protección larga duración vía API Smart Token confiable (ML-KEM). Master solo por operación; apertura independiente de Gatekeeper. Requiere VITE_SMART_TOKEN_API_URL.',
+      'Protección vía Smart-Token-Prod (repo aislado, API HTTP). ML-KEM + AES. Master solo en la petición. Requiere VITE_SMART_TOKEN_API_URL + API_KEY. Sin modo demo.',
     encrypts: true,
     usesTdcp: false,
     usesSmartToken: true,
@@ -60,7 +60,7 @@ export const PROTECTION_MODES: ProtectionModeOption[] = [
     label: 'Smart Token + CSG',
     short: 'STP+CSG',
     description:
-      'Artifact Smart Token + sello CSG de integridad calculado sobre los bytes originales del archivo (verificable tras open).',
+      'Smart-Token-Prod + sello CSG sobre bytes originales (verificable tras open). Requiere API STP configurada.',
     encrypts: true,
     usesTdcp: false,
     usesSmartToken: true,
