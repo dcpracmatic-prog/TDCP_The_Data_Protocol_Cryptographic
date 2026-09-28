@@ -471,7 +471,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCurrentUser(null);
   };
 
-  /** Local MVP demo gate — does not call Firebase/Gemini and does not weaken crypto. */
+  /** Demo entry removed for pre-production. */
+  const enterDemoSession = () => {
+    throw new Error('Modo demo deshabilitado en pre-producción. Use Iniciar sesión o Crear cuenta.');
+  };
+
+
   const enterDemoSession = () => {
     const demoUser: DCPUser = {
       id: 'DCP-DEMO-MVP-0001',

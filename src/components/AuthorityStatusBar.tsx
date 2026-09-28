@@ -184,14 +184,14 @@ export function AuthorityStatusBar() {
 
   let bannerText: string;
   if (health.state === 'connected' && remoteUrl) {
-    bannerText = `MVP operativo — Authority remoto en ${remoteUrl} (file signing — not HSM)`;
+    bannerText = `Pre-prod — Authority en ${remoteUrl} (file signing — not HSM)`;
   } else if (health.state === 'offline' && remoteUrl) {
-    bannerText = `MVP operativo — Authority remoto OFFLINE (${remoteUrl}); Oracle in-process si Authority caído para paneles locales`;
+    bannerText = `Pre-prod — Authority OFFLINE (${remoteUrl}); Oracle in-process si Authority caído para paneles locales`;
   } else if (health.state === 'checking' && remoteUrl) {
-    bannerText = `MVP operativo — comprobando Authority en ${remoteUrl}…`;
+    bannerText = `Pre-prod — comprobando Authority en ${remoteUrl}…`;
   } else {
     bannerText =
-      'MVP / Demo — Oracle in-process (sin TDCP_AUTHORITY_URL). No es frontera de producción.';
+      'Pre-prod — Oracle in-process (sin TDCP_AUTHORITY_URL).';
   }
 
   return (
