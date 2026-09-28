@@ -250,13 +250,13 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
         }
       }
 
-      if (method === 'GET' && path.startsWith('/v1/public-key')) {
+      if (method === 'GET' && /^\/v1\/public-key\/?$/.test(path)) {
         sendJson(res, 200, await service.getPublicInfo(), req);
         finish(200);
         return;
       }
 
-      if (method === 'POST' && path.startsWith('/v1/challenge/validate')) {
+      if (method === 'POST' && /^\/v1\/challenge\/validate\/?$/.test(path)) {
         const body = (await readJson(req)) as { challenge?: string };
         const valid = await service.isValidChallenge(body?.challenge || '');
         sendJson(res, 200, { valid }, req);
@@ -271,13 +271,23 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
         return;
       }
 
-      if (method === 'POST' && path.startsWith('/v1/documents/register')) {
+      if (method === 'POST' && /^\/v1\/documents\/register\/?$/.test(path)) {
         const policy = (await readJson(req)) as Parameters<
           DurableAuthorityService['registerDocumentPolicy']
         >[0];
-        const secret = await service.registerDocumentPolicy(policy);
-        sendJson(res, 200, { wrapSecretBase64: arrayBufferToBase64(secret) }, req);
-        finish(200);
+        try {
+          const secret = await service.registerDocumentPolicy(policy);
+          sendJson(res, 200, { wrapSecretBase64: arrayBufferToBase64(secret) }, req);
+          finish(200);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (msg === 'DOCUMENT_ALREADY_REGISTERED') {
+            sendJson(res, 409, { error: 'DOCUMENT_ALREADY_REGISTERED' }, req);
+            finish(409, 'DOCUMENT_ALREADY_REGISTERED');
+          } else {
+            throw err;
+          }
+        }
         return;
       }
 
@@ -316,10 +326,17 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
         }
       }
 
-      if (method === 'POST' && path.startsWith('/v1/authorize')) {
+      if (method === 'POST' && /^\/v1\/authorize\/?$/.test(path)) {
         const request = (await readJson(req)) as Parameters<
           DurableAuthorityService['processAuthorizationRequest']
         >[0];
+        // Strip untrusted client presence claims (PoC: forged biometricVerified on /v1/authorize).
+        // WebAuthn / device assertion ceremony is required before Authority sets these server-side.
+        if (request && typeof request === 'object' && request.policyContext) {
+          const { biometricVerified: _bv, biometricAssertionVerified: _bav, ...restCtx } =
+            request.policyContext as Record<string, unknown>;
+          request.policyContext = restCtx as typeof request.policyContext;
+        }
         const result = await service.processAuthorizationRequest(request);
         if (result.granted) metrics.grantsIssued += 1;
         else metrics.grantsDenied += 1;
@@ -328,7 +345,7 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
         return;
       }
 
-      if (method === 'POST' && path.startsWith('/v1/wrap-secret/release')) {
+      if (method === 'POST' && /^\/v1\/wrap-secret\/release\/?$/.test(path)) {
         const body = (await readJson(req)) as {
           grant: Parameters<DurableAuthorityService['releaseDocumentWrapSecretForGrant']>[0];
         };
@@ -340,7 +357,7 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
         return;
       }
 
-      if (method === 'POST' && path.startsWith('/v1/view-once/commit')) {
+      if (method === 'POST' && /^\/v1\/view-once\/commit\/?$/.test(path)) {
         const body = (await readJson(req)) as { documentId: string; grantId: string };
         const committed = await service.commitViewOnce(body.documentId, body.grantId);
         sendJson(res, 200, { committed }, req);
@@ -348,7 +365,7 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
         return;
       }
 
-      if (method === 'POST' && path.startsWith('/v1/revoke')) {
+      if (method === 'POST' && /^\/v1\/revoke\/?$/.test(path)) {
         const body = (await readJson(req)) as {
           documentId: string;
           reason?: string;
@@ -365,7 +382,7 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
         return;
       }
 
-      if (method === 'POST' && path.startsWith('/v1/restore')) {
+      if (method === 'POST' && /^\/v1\/restore\/?$/.test(path)) {
         const body = (await readJson(req)) as { documentId: string };
         const state = await service.restoreDocument(body.documentId);
         metrics.restores += 1;
@@ -374,7 +391,7 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
         return;
       }
 
-      if (method === 'GET' && path.startsWith('/v1/revoked')) {
+      if (method === 'GET' && /^\/v1\/revoked\/?$/.test(path)) {
         sendJson(res, 200, { revoked: await service.listRevoked() }, req);
         finish(200);
         return;

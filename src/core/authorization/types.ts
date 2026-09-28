@@ -41,7 +41,13 @@ export interface AuthorizationRequest {
   timestamp: number; // Client requested time (untrusted)
   policyContext?: {
     location?: string;
+    /** @deprecated Untrusted client claim — ignored by policy engine. */
     biometricVerified?: boolean;
+    /**
+     * Set only by a trusted control-plane step after verifying WebAuthn / device
+     * assertion. Client-supplied true without verification must not be accepted.
+     */
+    biometricAssertionVerified?: boolean;
     anomalyScore?: number;
   };
 }

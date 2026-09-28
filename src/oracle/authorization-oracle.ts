@@ -107,13 +107,13 @@ export class AuthorizationOracle {
    * written into the package.
    */
   public registerDocumentPolicy(policy: RegisteredDocumentPolicy): Uint8Array {
+    if (this.documentPolicies.has(policy.documentId)) {
+      throw new Error('DOCUMENT_ALREADY_REGISTERED');
+    }
     this.documentPolicies.set(policy.documentId, policy);
     this.revocationManager.getOrCreateState(policy.documentId);
-    let secret = this.documentWrapSecrets.get(policy.documentId);
-    if (!secret) {
-      secret = generateRandomBytes(32);
-      this.documentWrapSecrets.set(policy.documentId, secret);
-    }
+    const secret = generateRandomBytes(32);
+    this.documentWrapSecrets.set(policy.documentId, secret);
     return secret;
   }
 
@@ -158,6 +158,10 @@ export class AuthorizationOracle {
     if (!secret) return null;
 
     this.consumedGrantIds.add(grant.grantId);
+    // Burn view-once at the instant the wrap secret is delivered (not only on explicit commit).
+    if (policy.viewOnce) {
+      this.revocationManager.markViewOnceConsumed(grant.documentId);
+    }
     return new Uint8Array(secret);
   }
 

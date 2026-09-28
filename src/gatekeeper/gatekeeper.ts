@@ -241,7 +241,9 @@ export class DCPGatekeeper {
       requestedOperation,
       timestamp: Date.now(),
       policyContext: {
+        // Only set assertion flag after local BiometricProvider.verifyPresence succeeded.
         biometricVerified,
+        biometricAssertionVerified: biometricVerified === true,
       },
     };
 
