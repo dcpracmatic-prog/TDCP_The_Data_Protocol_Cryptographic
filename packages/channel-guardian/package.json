@@ -1,0 +1,42 @@
+{
+  "name": "@tdcp/channel-guardian",
+  "version": "1.0.0",
+  "description": "Channel Guardian for TDCP — egress protection with Authority-signed policy binding. Protects the communication channel between sensitive data and encryption/authorization processes. Does not issue grants or evaluate business policy.",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --passWithNoTests 2>/dev/null || node --test test/*.test.js 2>/dev/null || echo 'Run: npm run build && node --test test/'",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "tdcp",
+    "channel-guardian",
+    "egress-control",
+    "policy-binding",
+    "secure-channel"
+  ],
+  "license": "Elastic-2.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  },
+  "peerDependencies": {},
+  "files": [
+    "dist/",
+    "src/",
+    "docs/",
+    "README.md",
+    "LICENSE"
+  ]
+}

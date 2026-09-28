@@ -134,3 +134,7 @@ This version remains a serious protocol reference/demo, not a declaration of for
 
 See also: `PRODUCT.md`, `ROADMAP.md`, `DEPLOY.md`, `ARCHITECTURE.md`, `MARKET.md`, `AUDIT_2.5.1.md`, `docs/PRODUCT_ES.md`.
 Python sketch (demo only): `sdk/python/`.
+
+## Channel Guardian (optional plane)
+
+Egress / channel protection after Gatekeeper grant. Package: [`packages/channel-guardian`](./packages/channel-guardian) · Docs: [`docs/CHANNEL_GUARDIAN.md`](./docs/CHANNEL_GUARDIAN.md).

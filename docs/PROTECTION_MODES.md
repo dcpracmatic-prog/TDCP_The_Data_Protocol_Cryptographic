@@ -32,3 +32,7 @@ CORS: el API debe permitir el origen de la UI (p. ej. `https://tdcp.vercel.app`)
 ## CSG
 
 `createCsgSeal` / `verifyCsgSeal`: sidecar `VITE_CSG_SEAL_URL` o sello local de desarrollo.
+
+## Channel Guardian (egress)
+
+Plano aditivo de **canal** tras el grant: bordes y presupuestos firmados por Authority. No cifra ni autoriza. Ver `docs/CHANNEL_GUARDIAN.md` y `packages/channel-guardian`.
