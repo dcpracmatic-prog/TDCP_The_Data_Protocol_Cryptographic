@@ -21,7 +21,7 @@ export interface DeviceIdentityProvider {
  * Deterministic device identity for local testing and demonstration.
  */
 export class MockDeviceIdentityProvider implements DeviceIdentityProvider {
-  public providerName = 'MockDeviceIdentityProvider (DEMO / MOCK / DEVELOPMENT ONLY)';
+  public providerName = 'Identidad de dispositivo local (desarrollo)';
   public isHardwareBacked = false;
 
   private mockDeviceId: string = 'DEV-STATION-SECTOR-4';

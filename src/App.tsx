@@ -225,7 +225,7 @@ function MainDCPApp() {
                     </div>
                     <button
                       onClick={logout}
-                      title="Cerrar sesión / salir demo"
+                      title="Cerrar sesión"
                       className="shrink-0 cursor-pointer rounded-lg p-1.5 text-white/40 hover:bg-white/10 hover:text-red-400"
                     >
                       <LogOut className="h-3.5 w-3.5" />
@@ -288,8 +288,8 @@ function MainDCPApp() {
                   </div>
                   <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[9px] font-bold leading-snug tracking-wide text-amber-100 uppercase">
                     {providers.authorityKind === 'HTTP_REMOTE'
-                      ? 'MVP — remote Authority (not HSM)'
-                      : providers.modeBadge || 'MVP / Demo — Oracle in-browser'}
+                      ? 'Authority remoto (sin HSM)'
+                      : providers.modeBadge || 'Oracle local (sin Authority remoto)'}
                   </div>
                   <div className="space-y-1.5 text-[11px] text-white/60">
                     <div className="flex items-center justify-between">
@@ -331,7 +331,7 @@ function MainDCPApp() {
                   onClick={logout}
                   className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs font-bold tracking-wider text-red-300 uppercase hover:bg-red-500/20"
                 >
-                  <LogOut className="h-3.5 w-3.5" /> Cerrar sesión / salir demo
+                  <LogOut className="h-3.5 w-3.5" /> Cerrar sesión
                 </button>
                 <p className="text-center text-[10px] tracking-tight text-white/30">
                   The Data Cryptographic Protocol © 2026

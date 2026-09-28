@@ -50,7 +50,7 @@ export function requireSmartTokenClient(): SmartTokenClient {
   if (!cfg) {
     throw new Error(
       'Smart Token no está configurado. Defina VITE_SMART_TOKEN_API_URL y VITE_SMART_TOKEN_API_KEY ' +
-        'apuntando al servicio Smart-Token-Prod (repo aislado). Sin API no hay modo demo.'
+        'apuntando al servicio Smart-Token-Prod (repo aislado). Configure VITE_SMART_TOKEN_API_URL y VITE_SMART_TOKEN_API_KEY.'
     );
   }
   if (!cfg.apiKey) {

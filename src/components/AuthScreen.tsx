@@ -217,7 +217,7 @@ export default function AuthScreen() {
             The Data Cryptographic Protocol
           </p>
           <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-[10px] text-purple-300">
-            <ShieldCheck className="w-3 h-3 text-purple-400" /> Autenticación Obligatoria de Acceso
+            <ShieldCheck className="w-3 h-3 text-purple-400" /> Acceso de pre-producción
           </div>
 
         </div>

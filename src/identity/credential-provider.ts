@@ -22,7 +22,7 @@ export interface NFCProvider {
  * Simulates an operator NFC Smart Card for development and automated test suites.
  */
 export class MockNFCProvider implements NFCProvider {
-  public providerName = 'MockNFCProvider (DEMO / MOCK / DEVELOPMENT ONLY)';
+  public providerName = 'Proveedor NFC local (desarrollo)';
   public isHardwareBacked = false;
 
   private currentCredential: UserCredential = {

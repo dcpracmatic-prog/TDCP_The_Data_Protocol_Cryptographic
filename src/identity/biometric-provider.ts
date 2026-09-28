@@ -31,7 +31,7 @@ export interface BiometricProvider {
  * [DEMO / MOCK / DEVELOPMENT ONLY]
  */
 export class MockBiometricProvider implements BiometricProvider {
-  public providerName = 'MockBiometricProvider (DEMO / MOCK / DEVELOPMENT ONLY)';
+  public providerName = 'Proveedor biométrico local (desarrollo)';
   public isHardwareBacked = false;
 
   private simulateSuccess: boolean = true;

@@ -236,7 +236,7 @@ export default function SecurityDevicesPanel() {
                   <div>
                     <div className="text-xs font-bold text-white">Backend de firma en USB HSM</div>
                     <div className="text-[10px] text-white/40">
-                      Preferir firma vía módulo USB (soft-USB en demo; PKCS#11 en producción).
+                      Preferir firma vía módulo USB (binding local; PKCS#11 en producción).
                     </div>
                   </div>
                 </div>

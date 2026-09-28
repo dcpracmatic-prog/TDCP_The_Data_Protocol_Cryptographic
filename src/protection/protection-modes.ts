@@ -49,7 +49,7 @@ export const PROTECTION_MODES: ProtectionModeOption[] = [
     label: 'Smart Token',
     short: 'STP',
     description:
-      'Protección vía Smart-Token-Prod (repo aislado, API HTTP). ML-KEM + AES. Master solo en la petición. Requiere VITE_SMART_TOKEN_API_URL + API_KEY. Sin modo demo.',
+      'Protección vía Smart-Token-Prod (repo aislado, API HTTP). ML-KEM + AES. Master solo en la petición. Requiere VITE_SMART_TOKEN_API_URL + API_KEY.',
     encrypts: true,
     usesTdcp: false,
     usesSmartToken: true,

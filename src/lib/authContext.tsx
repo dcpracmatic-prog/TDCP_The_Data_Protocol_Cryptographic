@@ -471,28 +471,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCurrentUser(null);
   };
 
-  /** Demo entry removed for pre-production. */
+  /** Pre-production: demo session entry is disabled. */
   const enterDemoSession = () => {
-    throw new Error('Modo demo deshabilitado en pre-producción. Use Iniciar sesión o Crear cuenta.');
-  };
-
-
-  const enterDemoSession = () => {
-    const demoUser: DCPUser = {
-      id: 'DCP-DEMO-MVP-0001',
-      name: 'Demo MVP',
-      email: 'demo@tdcp.local',
-      passwordHash: '',
-      securityQuestion: 'demo',
-      securityAnswerHash: '',
-      driveFolderLink: '',
-      driveFolderId: '',
-      sharedFolders: [],
-      createdAt: Date.now(),
-      lastLogin: Date.now(),
-    };
-    localStorage.setItem(STORAGE_SESSION_KEY, JSON.stringify(demoUser));
-    setCurrentUser(demoUser);
+    throw new Error(
+      'El acceso de demostración está deshabilitado. Inicie sesión o cree una cuenta.'
+    );
   };
 
   return (

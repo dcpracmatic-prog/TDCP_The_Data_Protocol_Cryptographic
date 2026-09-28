@@ -78,8 +78,8 @@ export class TdcpRuntime {
       authorityUrl: authorityUrl ?? null,
       modeBadge:
         this.authority.kind === 'HTTP_REMOTE'
-          ? 'Production path — remote Authority (TDCP_AUTHORITY_URL)'
-          : 'Reference / Demo — Oracle in-browser',
+          ? 'Authority remoto activo'
+          : 'Oracle local (sin Authority remoto)',
       oracleKeyStore: this.oracle.getKeyStoreKind(),
       oracleKeyStoreDevelopmentOnly: this.oracle.isDevelopmentKeyStore(),
       nfc: {

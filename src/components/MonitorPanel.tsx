@@ -153,7 +153,7 @@ export default function MonitorPanel() {
         <div className="mb-2 max-w-full shrink-0">
         <CollapsibleSection
           title="Historial de paquetes creados"
-          subtitle="Contraseñas selladas · PIN local (demo)"
+          subtitle="Contraseñas selladas · PIN local"
           accent="pink"
           defaultOpen={false}
         >
@@ -174,7 +174,7 @@ export default function MonitorPanel() {
                   type="button"
                   onClick={async () => {
                     setHistPinError(null);
-                    const ok = await unlockHistory(histPin.trim() || 'tdcp-demo-pin');
+                    const ok = await unlockHistory(histPin.trim());
                     if (!ok) setHistPinError('PIN incorrecto');
                     else setHistPin('');
                   }}

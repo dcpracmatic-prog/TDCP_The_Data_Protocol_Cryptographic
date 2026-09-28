@@ -176,7 +176,7 @@ export function SmartTokenStatusChip({ className = '' }: { className?: string })
   );
 }
 
-/** Always-visible MVP / Authority honesty banner + connection chip. */
+/** Always-visible Authority status banner + connection chips. */
 export function AuthorityStatusBar() {
   const health = useAuthorityHealth();
   const providers = tdcpRuntime.getProviderStatus();

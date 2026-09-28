@@ -140,9 +140,9 @@ export default function DecryptPanel() {
         }
         if ((json as { schema?: string }).schema === 'tdcp.soft-stok.v1') {
           setParseError(
-            'Artefacto soft/demo Smart Token no admitido en pre-producción. Use un .stok.json emitido por la API Smart-Token-Prod.'
+            'Artefacto Smart Token no válido para pre-producción. Use un .stok.json emitido por la API Smart-Token-Prod.'
           );
-          setLogs('Rechazado: soft Smart Token eliminado del flujo TDCP.');
+          setLogs('Rechazado: formato Smart Token no admitido. Use la API Smart-Token-Prod.');
           return;
         }
       } catch {
