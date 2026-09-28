@@ -32,10 +32,14 @@ import { DeterministicPolicyEngine } from '../core/policy/policy-engine.ts';
 import { EpochRevocationManager } from '../core/revocation/epoch-manager.ts';
 import { AntiReplayRegistry } from '../core/replay/replay-cache.ts';
 import {
-import { defaultOperationEdges, signPolicyBinding } from '../channel/channel-budget.ts';
   DevelopmentInMemoryOracleKeyStore,
   type OracleKeyStore,
 } from './oracle-key-store.ts';
+import {
+  defaultOperationEdges,
+  signPolicyBinding,
+  type PolicyBinding,
+} from '../channel/channel-budget.ts';
 
 export interface RegisteredDocumentPolicy {
   documentId: string;
@@ -177,7 +181,7 @@ export class AuthorizationOracle {
   public async processAuthorizationRequest(request: AuthorizationRequest): Promise<{
     granted: boolean;
     grant?: AuthorizationGrant;
-    channelPolicyBinding?: import('../channel/channel-budget.ts').PolicyBinding;
+    channelPolicyBinding?: PolicyBinding;
     rejectionReason?: string;
     rejectionCode?: string;
   }> {
@@ -287,7 +291,7 @@ export class AuthorizationOracle {
     }
 
         // Workflow-channel budget bound to this grant (cooperative ChannelBudget plane).
-    let channelPolicyBinding: import('../channel/channel-budget.ts').PolicyBinding | undefined;
+    let channelPolicyBinding: PolicyBinding | undefined;
     try {
       const keyPair = await this.keyStore.getOrCreateSigningKey();
       const maxBytes = 16 * 1024 * 1024; // 16 MiB default operation budget
