@@ -54,3 +54,6 @@ attachments/
 data/mtls-dev/
 # Local MVP runtime (pids, logs, local admin token)
 .mvp/
+
+!packages/channel-guardian/dist/
+!packages/channel-guardian/dist/**

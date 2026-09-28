@@ -131,3 +131,42 @@ describe("Canonicalization", () => {
     assert.equal(policyHash(canonicalizePolicy(a)), policyHash(canonicalizePolicy(b)));
   });
 });
+
+describe("Schema and lifecycle hardening", () => {
+  it("rejects duplicate edges at sign/verify", () => {
+    const { publicKey, privateKey } = generateAuthorityKeyPair();
+    const policy = makePolicy({
+      edges: [
+        { source: "A", destination: "B", expectedBytes: 10, allowed: true },
+        { source: "A", destination: "B", expectedBytes: 20, allowed: true },
+      ],
+    });
+    assert.throws(() => signPolicyBinding(policy, privateKey, "kid"), /duplicate edge/);
+  });
+
+  it("rejects invalid schema (missing grantId)", () => {
+    const { privateKey } = generateAuthorityKeyPair();
+    const policy = makePolicy({ grantId: "" });
+    assert.throws(() => signPolicyBinding(policy, privateKey, "kid"), /grantId/);
+  });
+
+  it("rejects send after expiry", () => {
+    const { publicKey, privateKey } = generateAuthorityKeyPair();
+    const policy = makePolicy({ expiry: Date.now() + 30 });
+    const binding = signPolicyBinding(policy, privateKey, "kid");
+    const g = ChannelGuardian.fromBinding(binding, publicKey);
+    // Force expiry by waiting — use a policy already near-expired via reflection
+    // Instead: construct binding with expiry in the past is blocked at fromBinding;
+    // for send-path, use short expiry and mock time is hard — call with expired
+    // by rebuilding: sign with future, then we need internal clock.
+    // Practical test: sign with expiry = now+5ms, busy-wait, then send.
+    const policy2 = makePolicy({ expiry: Date.now() + 5 });
+    const binding2 = signPolicyBinding(policy2, privateKey, "kid");
+    const g2 = ChannelGuardian.fromBinding(binding2, publicKey);
+    const start = Date.now();
+    while (Date.now() - start < 15) { /* spin */ }
+    const r = g2.send("A->B", Buffer.from("x"), 0);
+    assert.equal(r.accepted, false);
+    assert.ok(g2.auditEvents().some((e) => e.reason === "binding_expired_at_send"));
+  });
+});

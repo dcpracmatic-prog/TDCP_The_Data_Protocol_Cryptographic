@@ -46,3 +46,31 @@ node --test packages/channel-guardian/test/guardian.test.mjs
 ## Estado
 
 Paquete integrado como **plano aditivo opcional** (pre-producción). La emisión de `PolicyBinding` desde Authority remoto es el siguiente cableado de producto; la biblioteca y el contrato ya están listos.
+
+
+## Claim de producto (honestidad)
+
+La biblioteca **en proceso** solo aplica la política a tramas que la aplicación **elige** pasar por `guardian.send`. Eso **no** es un control de egress de red obligatorio:
+
+| Capacidad real hoy | Nombre honesto |
+|--------------------|----------------|
+| Presupuestos de bytes y aristas firmados, cuarentena cooperativa | **Presupuesto de canal / política de canal cooperativa** |
+| Único camino de red (proxy, sidecar, eBPF, allowlist de sockets) | **Protección de egress** (requiere componente de enforcement de red) |
+
+Hasta que exista un proxy/sidecar como único camino de red, la documentación de producto debe preferir **presupuesto de canal**, no “egress protection” como garantía absoluta.
+
+## Hardening (biblioteca)
+
+- Validación de esquema de `ChannelPolicy` (documentId, grantId, edges, expectedBytes).
+- Rechazo de aristas duplicadas.
+- Comprobación de `expiry` en `fromBinding` **y** en cada `send`.
+- Tests: `node --test packages/channel-guardian/test/guardian.test.mjs` (incluido en `npm test` / CI).
+
+## Authority (siguiente cableado)
+
+La emisión de `PolicyBinding` ligado al `grantId` consumido **aún no** está en el servidor Authority. Contrato listo en `src/channel/policy-binding.ts`. Cuando se cablee:
+
+1. Al emitir el grant, construir `ChannelPolicy` con el mismo `grantId`.
+2. `signPolicyBinding` con la clave de Authority.
+3. Devolver binding junto al material del grant.
+4. El cliente solo acepta binding cuyo `grantId` coincida con el grant verificado.

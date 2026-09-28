@@ -44,6 +44,43 @@ export function policyHash(canonical: string): string {
  *
  * This is the sole entry point for materializing links — closes D1/D1b/D2.
  */
+
+/** Validate ChannelPolicy shape and reject duplicate edges. */
+export function validateChannelPolicy(policy: ChannelPolicy): void {
+  if (!policy || typeof policy !== "object") {
+    throw new Error("policy_binding_rejected: invalid policy object");
+  }
+  if (typeof policy.documentId !== "string" || policy.documentId.length === 0) {
+    throw new Error("policy_binding_rejected: documentId required");
+  }
+  if (typeof policy.grantId !== "string" || policy.grantId.length === 0) {
+    throw new Error("policy_binding_rejected: grantId required");
+  }
+  if (typeof policy.expiry !== "number" || !Number.isFinite(policy.expiry)) {
+    throw new Error("policy_binding_rejected: expiry must be a finite number");
+  }
+  if (!Array.isArray(policy.edges) || policy.edges.length === 0) {
+    throw new Error("policy_binding_rejected: empty edges");
+  }
+  const seen = new Set<string>();
+  for (const e of policy.edges) {
+    if (!e || typeof e.source !== "string" || typeof e.destination !== "string") {
+      throw new Error("policy_binding_rejected: edge source/destination required");
+    }
+    if (typeof e.expectedBytes !== "number" || e.expectedBytes < 0 || !Number.isFinite(e.expectedBytes)) {
+      throw new Error("policy_binding_rejected: expectedBytes must be a non-negative finite number");
+    }
+    if (typeof e.allowed !== "boolean") {
+      throw new Error("policy_binding_rejected: allowed must be boolean");
+    }
+    const k = edgeKey(e);
+    if (seen.has(k)) {
+      throw new Error(`policy_binding_rejected: duplicate edge ${k}`);
+    }
+    seen.add(k);
+  }
+}
+
 export function verifyPolicyBinding(
   binding: PolicyBinding,
   authorityPublicKey: KeyObject | string,
@@ -69,14 +106,17 @@ export function verifyPolicyBinding(
     throw new Error("policy_binding_rejected: invalid signature");
   }
 
-  const policy = JSON.parse(binding.policyCanonical) as ChannelPolicy;
-
-  if (typeof policy.expiry !== "number" || policy.expiry < now) {
-    throw new Error("policy_binding_rejected: expired");
+  let policy: ChannelPolicy;
+  try {
+    policy = JSON.parse(binding.policyCanonical) as ChannelPolicy;
+  } catch {
+    throw new Error("policy_binding_rejected: canonical JSON parse failed");
   }
 
-  if (!Array.isArray(policy.edges) || policy.edges.length === 0) {
-    throw new Error("policy_binding_rejected: empty edges");
+  validateChannelPolicy(policy);
+
+  if (policy.expiry < now) {
+    throw new Error("policy_binding_rejected: expired");
   }
 
   return policy;
@@ -91,6 +131,7 @@ export function signPolicyBinding(
   authorityPrivateKey: KeyObject,
   authorityKid: string,
 ): PolicyBinding {
+  validateChannelPolicy(policy);
   const policyCanonical = canonicalizePolicy(policy);
   const hash = policyHash(policyCanonical);
   const signer = createSign("SHA256");

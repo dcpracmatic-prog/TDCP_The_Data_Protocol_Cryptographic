@@ -34,6 +34,7 @@ export {
   generateAuthorityKeyPair,
   policyHash,
   signPolicyBinding,
+  validateChannelPolicy,
   verifyPolicyBinding,
 } from "./policy.js";
 export { ChannelGuardian } from "./guardian.js";

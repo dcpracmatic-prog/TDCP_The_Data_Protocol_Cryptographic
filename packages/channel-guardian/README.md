@@ -1,6 +1,6 @@
 # @tdcp/channel-guardian
 
-**Channel Guardian for TDCP** — egress protection with Authority-signed policy binding.
+**Channel Guardian for TDCP** — cooperative channel budget with Authority-signed policy binding.
 
 > Protects the communication channel between sensitive data and encryption/authorization processes.  
 > Does **not** issue grants, evaluate business policy, or hold wrap secrets.
