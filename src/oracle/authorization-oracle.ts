@@ -32,6 +32,7 @@ import { DeterministicPolicyEngine } from '../core/policy/policy-engine.ts';
 import { EpochRevocationManager } from '../core/revocation/epoch-manager.ts';
 import { AntiReplayRegistry } from '../core/replay/replay-cache.ts';
 import {
+import { defaultOperationEdges, signPolicyBinding } from '../channel/channel-budget.ts';
   DevelopmentInMemoryOracleKeyStore,
   type OracleKeyStore,
 } from './oracle-key-store.ts';
@@ -176,6 +177,7 @@ export class AuthorizationOracle {
   public async processAuthorizationRequest(request: AuthorizationRequest): Promise<{
     granted: boolean;
     grant?: AuthorizationGrant;
+    channelPolicyBinding?: import('../channel/channel-budget.ts').PolicyBinding;
     rejectionReason?: string;
     rejectionCode?: string;
   }> {
@@ -284,10 +286,33 @@ export class AuthorizationOracle {
       };
     }
 
+        // Workflow-channel budget bound to this grant (cooperative ChannelBudget plane).
+    let channelPolicyBinding: import('../channel/channel-budget.ts').PolicyBinding | undefined;
+    try {
+      const keyPair = await this.keyStore.getOrCreateSigningKey();
+      const maxBytes = 16 * 1024 * 1024; // 16 MiB default operation budget
+      const channelPolicy = {
+        documentId: fullGrant.documentId,
+        grantId: fullGrant.grantId,
+        expiry: fullGrant.expiresAt,
+        edges: defaultOperationEdges(maxBytes),
+      };
+      channelPolicyBinding = await signPolicyBinding(
+        channelPolicy,
+        keyPair.privateKey,
+        fullGrant.oracleKeyId,
+      );
+    } catch {
+      // Channel binding is additive; grant remains valid if binding fails.
+      channelPolicyBinding = undefined;
+    }
+
     return {
       granted: true,
       grant: fullGrant,
+      channelPolicyBinding,
     };
+
   }
 }
 

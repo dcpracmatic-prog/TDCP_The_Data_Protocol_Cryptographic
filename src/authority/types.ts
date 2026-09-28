@@ -18,6 +18,8 @@ export type AuthorityKind = 'IN_PROCESS' | 'HTTP_REMOTE';
 export interface AuthorityAuthResult {
   granted: boolean;
   grant?: AuthorizationGrant;
+  /** Signed workflow-channel budget for this grant (ChannelBudget plane). */
+  channelPolicyBinding?: import('../channel/channel-budget.ts').PolicyBinding;
   rejectionReason?: string;
   rejectionCode?: string;
 }

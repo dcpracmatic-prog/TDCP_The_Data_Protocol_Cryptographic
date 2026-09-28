@@ -1,13 +1,7 @@
 /**
- * TDCP ↔ Channel Guardian contract (optional additive plane).
- *
- * Re-exports the binding shape expected after a Gatekeeper grant.
- * Full runtime lives in packages/channel-guardian (@tdcp/channel-guardian).
- *
- * Authority should sign ChannelPolicy with the same key family used for grants
- * (ECDSA P-256 in the reference design) and return PolicyBinding alongside grant material.
+ * Channel plane types — see channel-budget.ts (implemented).
+ * packages/channel-guardian remains a Node reference package with parallel tests.
  */
-
 export type {
   AuditEvent,
   ChannelPolicy,
@@ -15,16 +9,23 @@ export type {
   LinkState,
   PolicyBinding,
   SendResult,
-} from '../../packages/channel-guardian/src/types.ts';
+} from './channel-budget.ts';
 
-/**
- * Suggested Authority response extension (conceptual — wire when remote Authority
- * supports channel policy issuance).
- */
+export {
+  ChannelBudget,
+  canonicalizePolicy,
+  defaultOperationEdges,
+  edgeKey,
+  signPolicyBinding,
+  validateChannelPolicy,
+  verifyPolicyBinding,
+} from './channel-budget.ts';
+
+import type { PolicyBinding } from './channel-budget.ts';
+import type { AuthorizationGrant } from '../core/authorization/types.ts';
+
+/** Authority authorize response may include a signed channel binding for this grant. */
 export interface GrantWithChannelBinding {
-  grantId: string;
-  documentId: string;
-  expiresAt: number;
-  /** Optional. Present when the operation includes a signed channel policy. */
-  channelPolicyBinding?: import('../../packages/channel-guardian/src/types.ts').PolicyBinding;
+  grant: AuthorizationGrant;
+  channelPolicyBinding?: PolicyBinding;
 }
