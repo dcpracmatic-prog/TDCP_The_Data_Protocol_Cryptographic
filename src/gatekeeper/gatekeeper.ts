@@ -6,6 +6,8 @@
  * UI components must not call AES-GCM, PBKDF2, or derive keys themselves.
  */
 
+import { policyRequiresUsbHsm } from '../core/authorization/usb-hsm.ts';
+import type { UsbHsmProof, UsbHsmProverFn } from '../identity/usb-hsm-provider.ts';
 import {
   createAADBytes,
   deriveKeyWrappingKey,
@@ -14,6 +16,7 @@ import {
 } from '../core/package/package-format.ts';
 import type { TDCPPackage } from '../core/package/package-format.ts';
 import type { AuthorizationRequest, TDCPRequestedOperation } from '../core/authorization/types.ts';
+import { canonicalizeGrant } from '../core/authorization/types.ts';
 import { verifyAuthorizationGrant } from '../core/authorization/grant-verifier.ts';
 import {
   deriveRootKeyFromSecret,
@@ -36,6 +39,8 @@ import type { NFCProvider } from '../identity/credential-provider.ts';
 import type { DeviceIdentityProvider } from '../identity/device-identity-provider.ts';
 import type { BiometricProvider } from '../identity/biometric-provider.ts';
 import { verifyABCInterlockingIntegrity } from '../core/package/ultra-critical.ts';
+import { verifyPolicyBinding, type PolicyBinding } from '../channel/policy-binding.ts';
+import { createCsgOperationSeal, type CsgSealDocument } from '../protection/csg-seal.ts';
 
 export interface GatekeeperUnlockOptions {
   packageData: TDCPPackage;
@@ -52,6 +57,11 @@ export interface GatekeeperUnlockOptions {
    */
   authority?: AuthorizationAuthority;
   auditSink?: AuditSink;
+  /**
+   * Signs the request with the user's USB-HSM (WebAuthn). Required when the
+   * registered policy demands it (requireUsbHsm or CRITICAL/ULTRA_CRITICAL).
+   */
+  usbHsmProver?: UsbHsmProverFn;
   customChallenge?: string;
 }
 
@@ -64,6 +74,8 @@ export interface GatekeeperUnlockResult {
   errorMessage?: string;
   errorCode?: string;
   auditEventId?: string;
+  /** CSG attestation binding grant + policy + device + operation. */
+  csgOperationSeal?: CsgSealDocument;
 }
 
 function concatBuffers(a: ArrayBuffer, b: ArrayBuffer): ArrayBuffer {
@@ -109,7 +121,25 @@ export class DCPGatekeeper {
     const operationId = generateRandomId('OP');
     // Test harnesses may inject a challenge, but the challenge must already be
     // registered. Production flow always obtains a fresh challenge from Oracle.
-    const challenge = customChallenge || (await authority.issueChallenge());
+    let challenge: string;
+    try {
+      challenge = customChallenge || (await authority.issueChallenge());
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('USER_AUTH_REQUIRED') || message.includes('USER_TOKEN_INVALID')) {
+        return {
+          success: false,
+          errorCode: 'USER_AUTH_REQUIRED',
+          errorMessage:
+            'El Authority exige una sesión de usuario válida. Inicia sesión con tu cuenta TDCP e inténtalo de nuevo.',
+        };
+      }
+      return {
+        success: false,
+        errorCode: 'AUTHORITY_UNAVAILABLE',
+        errorMessage: `No se pudo obtener un challenge del Authority: ${message}`,
+      };
+    }
 
     let credential;
     try {
@@ -179,8 +209,49 @@ export class DCPGatekeeper {
       };
     }
 
+    // ── USB-HSM: the user's hardware ID signs this exact request ─────────────
+    let usbHsmProof: UsbHsmProof | null = null;
+    if (policyRequiresUsbHsm(registeredPolicy) && authority.kind === 'HTTP_REMOTE') {
+      if (!options.usbHsmProver) {
+        return {
+          success: false,
+          errorCode: 'USB_HSM_REQUIRED',
+          errorMessage: 'Este documento solo se abre con tu USB-HSM registrado.',
+        };
+      }
+      try {
+        usbHsmProof = await options.usbHsmProver({
+          challenge,
+          documentId: packageData.documentId,
+          packageId: packageData.packageId,
+          operationId,
+          requestedOperation,
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { success: false, errorCode: 'USB_HSM_REQUIRED', errorMessage: message };
+      }
+      // With a USB-HSM the key IS both the credential and the device.
+      device = {
+        deviceId: usbHsmProof.deviceId,
+        hardwareBacked: true,
+        platform: 'usb-hsm',
+        fingerprintDigest: usbHsmProof.deviceId,
+        attestationType: 'USB_HSM_WEBAUTHN',
+      };
+      credential = {
+        credentialId: usbHsmProof.deviceId,
+        holderName: credential.holderName,
+        credentialType: 'FIDO2_AUTHENTICATOR',
+        assignedRole: credential.assignedRole,
+        isSimulated: false,
+      };
+    }
+
     let biometricVerified = false;
-    if (policyLevel === 'CRITICAL' || policyLevel === 'ULTRA_CRITICAL') {
+    // With a USB-HSM, user verification (PIN / on-key biometrics) is enforced
+    // by the key and re-checked by the Authority from the signed flags.
+    if ((policyLevel === 'CRITICAL' || policyLevel === 'ULTRA_CRITICAL') && !usbHsmProof) {
       if (!biometricProvider) {
         return {
           success: false,
@@ -241,10 +312,9 @@ export class DCPGatekeeper {
       requestedOperation,
       timestamp: Date.now(),
       policyContext: {
-        // Only set assertion flag after local BiometricProvider.verifyPresence succeeded.
-        biometricVerified,
-        biometricAssertionVerified: biometricVerified === true,
+        biometricVerified: usbHsmProof ? true : biometricVerified,
       },
+      ...(usbHsmProof ? { usbHsmAssertion: usbHsmProof.assertion } : {}),
     };
 
     const authResponse = await authority.processAuthorizationRequest(authRequest);
@@ -303,6 +373,55 @@ export class DCPGatekeeper {
         errorCode: verification.errorCode || 'GRANT_VERIFICATION_FAILED',
         errorMessage: verification.errorMessage,
       };
+    }
+
+    const channelPolicyBinding = authResponse.channelPolicyBinding as PolicyBinding | undefined;
+    if (!channelPolicyBinding) {
+      await auditSink.recordEvent({
+        documentId: packageData.documentId, packageId: packageData.packageId, deviceId: device.deviceId,
+        credentialId: credential.credentialId, operationId, authorizationId: grant.grantId,
+        operation: requestedOperation, policy: grant.policyLevel, result: 'DENIED',
+        details: 'POLICY_BINDING_MISSING: Authority no emitió PolicyBinding para el grant.',
+      });
+      return { success: false, errorCode: 'POLICY_BINDING_MISSING', errorMessage: 'El Authority no emitió el PolicyBinding requerido.' };
+    }
+
+    let verifiedChannelPolicy;
+    try {
+      verifiedChannelPolicy = await verifyPolicyBinding(channelPolicyBinding, oraclePublicKey, {
+        documentId: grant.documentId, grantId: grant.grantId, expiresAt: grant.expiresAt, authorityKid: grant.oracleKeyId,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await auditSink.recordEvent({
+        documentId: packageData.documentId, packageId: packageData.packageId, deviceId: device.deviceId,
+        credentialId: credential.credentialId, operationId, authorizationId: grant.grantId,
+        operation: requestedOperation, policy: grant.policyLevel, result: 'TAMPER_DETECTED',
+        details: `PolicyBinding inválido: ${message}`,
+      });
+      return { success: false, errorCode: 'POLICY_BINDING_INVALID', errorMessage: message };
+    }
+
+    const { signature: _grantSignature, ...unsignedGrant } = grant;
+    void _grantSignature;
+    let csgOperationSeal: CsgSealDocument;
+    try {
+      csgOperationSeal = await createCsgOperationSeal({
+        documentId: grant.documentId, packageId: grant.packageId, grantId: grant.grantId,
+        grantHash: await computeSHA256(canonicalizeGrant(unsignedGrant)),
+        policyHash: channelPolicyBinding.policyHash, deviceId: grant.deviceId,
+        operationId: grant.operationId, operation: grant.operation, expiresAt: grant.expiresAt,
+        edges: verifiedChannelPolicy.edges,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      await auditSink.recordEvent({
+        documentId: packageData.documentId, packageId: packageData.packageId, deviceId: device.deviceId,
+        credentialId: credential.credentialId, operationId, authorizationId: grant.grantId,
+        operation: requestedOperation, policy: grant.policyLevel, result: 'DENIED',
+        details: `CSG_OPERATION_ATTESTATION_FAILED: ${message}`,
+      });
+      return { success: false, errorCode: 'CSG_OPERATION_ATTESTATION_FAILED', errorMessage: message };
     }
 
     const wrapSecret = await authority.releaseDocumentWrapSecretForGrant(grant);
@@ -471,6 +590,7 @@ export class DCPGatekeeper {
       watermark,
       grant,
       auditEventId: auditEvent.eventId,
+      csgOperationSeal,
     };
   }
 }

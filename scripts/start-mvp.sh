@@ -40,11 +40,23 @@ export TDCP_AUTHORITY_PORT="$AUTHORITY_PORT"
 export TDCP_AUTHORITY_DATA_DIR="$DATA_DIR"
 export TDCP_AUTHORITY_URL="http://127.0.0.1:${AUTHORITY_PORT}"
 export VITE_TDCP_AUTHORITY_URL="$TDCP_AUTHORITY_URL"
-export VITE_TDCP_AUTHORITY_ADMIN_TOKEN="$ADMIN_TOKEN"
 export TDCP_DEMO_MODE=1
 export VITE_TDCP_DEMO_MODE=1
 export VITE_AUTH_ENABLED="${VITE_AUTH_ENABLED:-false}"
 export PORT="$WEB_PORT"
+
+if [[ "$VITE_AUTH_ENABLED" == "false" ]]; then
+  # Anonymous demo: the browser registers documents with the admin token (LOCAL ONLY).
+  export VITE_TDCP_AUTHORITY_ADMIN_TOKEN="$ADMIN_TOKEN"
+  export TDCP_USER_AUTH="${TDCP_USER_AUTH:-off}"
+else
+  # Accounts on: the Authority trusts only identity JWTs minted by this web app.
+  unset VITE_TDCP_AUTHORITY_ADMIN_TOKEN
+  export TDCP_USER_AUTH="${TDCP_USER_AUTH:-required}"
+  export TDCP_USER_JWKS_URL="${TDCP_USER_JWKS_URL:-http://127.0.0.1:${WEB_PORT}/api/auth/jwks}"
+  export TDCP_USER_ISSUER="${TDCP_USER_ISSUER:-${BETTER_AUTH_URL:-http://localhost:${WEB_PORT}}}"
+  export TDCP_USER_AUDIENCE="${TDCP_USER_AUDIENCE:-tdcp-authority}"
+fi
 
 # Stop leftovers from a previous MVP run
 if [[ -f "$MVP_DIR/authority.pid" ]]; then

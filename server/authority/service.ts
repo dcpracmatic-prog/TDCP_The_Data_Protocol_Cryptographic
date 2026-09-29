@@ -14,6 +14,7 @@ import { arrayBufferToBase64, base64ToArrayBuffer } from '../../src/core/crypto/
 import { InProcessAuthority } from '../../src/authority/in-process-authority.ts';
 import type { AuthorityPublicInfo } from '../../src/authority/types.ts';
 import { DurableJsonAuthorityStore, type DurableAuthoritySnapshot } from './durable-store.ts';
+import { UsbHsmRegistry, loadUsbHsmConfigFromEnv, type UsbHsmConfig } from './usb-hsm.ts';
 import {
   createAuthoritySigningKeyStore,
   readSigningBackendFromEnv,
@@ -31,6 +32,28 @@ function base64ToBytes(b64: string): Uint8Array {
 export interface DurableAuthorityServiceOptions {
   dataDir: string;
   signingBackend?: SigningBackendKind;
+  /** Require a verified user on every challenge/grant (set when user auth is on). */
+  requireSubject?: boolean;
+  /** WebAuthn relying-party config for USB-HSM (env when omitted). */
+  usbHsm?: UsbHsmConfig;
+}
+
+export class DocumentAlreadyRegisteredError extends Error {
+  constructor(documentId: string) {
+    super(`DOCUMENT_ALREADY_REGISTERED:${documentId}`);
+  }
+}
+
+const MAX_ACL_ENTRIES = 50;
+
+function sanitizeUserIds(ids: unknown): string[] {
+  if (!Array.isArray(ids)) return [];
+  const out = new Set<string>();
+  for (const id of ids) {
+    if (typeof id === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(id)) out.add(id);
+    if (out.size >= MAX_ACL_ENTRIES) break;
+  }
+  return Array.from(out);
 }
 
 export class DurableAuthorityService {
@@ -41,6 +64,9 @@ export class DurableAuthorityService {
   private readonly signingBackend: SigningBackendKind;
   private signingKeyLoaded = false;
   private initialized = false;
+  private readonly requireSubject: boolean;
+  private readonly usbHsmConfig: UsbHsmConfig;
+  private usbHsmRegistry!: UsbHsmRegistry;
 
   constructor(dataDirOrOptions: string | DurableAuthorityServiceOptions) {
     const options: DurableAuthorityServiceOptions =
@@ -50,6 +76,12 @@ export class DurableAuthorityService {
     this.store = new DurableJsonAuthorityStore(options.dataDir);
     this.snapshot = this.store.load();
     this.signingBackend = options.signingBackend ?? readSigningBackendFromEnv();
+    this.requireSubject = options.requireSubject === true;
+    this.usbHsmConfig = options.usbHsm ?? loadUsbHsmConfigFromEnv();
+  }
+
+  public getUsbHsm(): UsbHsmRegistry {
+    return this.usbHsmRegistry;
   }
 
   public async initialize(): Promise<void> {
@@ -63,7 +95,7 @@ export class DurableAuthorityService {
       },
     });
 
-    this.oracle = new AuthorizationOracle(keyStore);
+    this.oracle = new AuthorizationOracle(keyStore, { requireSubject: this.requireSubject });
     await this.oracle.initialize();
     this.signingKeyLoaded = true;
     this.authority = new InProcessAuthority(this.oracle);
@@ -96,10 +128,17 @@ export class DurableAuthorityService {
     const replay = this.oracle.getReplayRegistry();
     replay.hydrateConsumed(this.snapshot.consumedOperations);
     replay.hydrateActiveChallenges(this.snapshot.activeChallenges);
+    this.oracle.importChallengeSubjects(this.snapshot.challengeSubjects ?? []);
     const consumed = (this.oracle as unknown as { consumedGrantIds: Set<string> }).consumedGrantIds;
     for (const id of this.snapshot.consumedGrantIds) {
       consumed.add(id);
     }
+
+    this.usbHsmRegistry = new UsbHsmRegistry(
+      this.usbHsmConfig,
+      this.snapshot.usbHsmDevices ?? [],
+      () => this.persist()
+    );
 
     this.initialized = true;
   }
@@ -127,6 +166,10 @@ export class DurableAuthorityService {
       consumedOperations: replay.exportConsumed(),
       consumedGrantIds: Array.from(consumed),
       activeChallenges: replay.exportActiveChallenges(),
+      challengeSubjects: this.oracle.exportChallengeSubjects(),
+      usbHsmDevices: this.usbHsmRegistry
+        ? this.usbHsmRegistry.exportRecords()
+        : (this.snapshot.usbHsmDevices ?? []),
     };
   }
 
@@ -182,8 +225,8 @@ export class DurableAuthorityService {
     };
   }
 
-  public async issueChallenge(): Promise<string> {
-    const c = await this.authority.issueChallenge();
+  public async issueChallenge(subjectUserId?: string): Promise<string> {
+    const c = await this.authority.issueChallenge(subjectUserId);
     this.persist();
     return c;
   }
@@ -192,10 +235,62 @@ export class DurableAuthorityService {
     return this.authority.isValidChallenge(challenge);
   }
 
+  /**
+   * Admin/issuer registration. Refuses to overwrite an existing document
+   * (overwriting would reset revocation/view-once and rotate the wrap secret).
+   */
   public async registerDocumentPolicy(policy: RegisteredDocumentPolicy): Promise<Uint8Array> {
-    const secret = await this.authority.registerDocumentPolicy(policy);
+    if (!policy || typeof policy.documentId !== 'string' || !policy.documentId) {
+      throw new Error('INVALID_POLICY');
+    }
+    if (this.oracle.getDocumentPolicy(policy.documentId)) {
+      throw new DocumentAlreadyRegisteredError(policy.documentId);
+    }
+    const clean: RegisteredDocumentPolicy = {
+      ...policy,
+      ...(policy.ownerUserId ? { ownerUserId: String(policy.ownerUserId) } : {}),
+      allowedUserIds: sanitizeUserIds(policy.allowedUserIds),
+    };
+    const secret = await this.authority.registerDocumentPolicy(clean);
     this.persist();
     return secret;
+  }
+
+  /** User registration: owner is always the verified caller, never the body. */
+  public async registerOwnedDocument(
+    policy: RegisteredDocumentPolicy,
+    ownerUserId: string
+  ): Promise<Uint8Array> {
+    const { ownerUserId: _ignored, ...rest } = policy ?? ({} as RegisteredDocumentPolicy);
+    void _ignored;
+    return this.registerDocumentPolicy({
+      ...rest,
+      ownerUserId,
+      allowedUserIds: sanitizeUserIds(rest.allowedUserIds).filter((id) => id !== ownerUserId),
+      createdAt: Date.now(),
+    });
+  }
+
+  public async updateDocumentAcl(documentId: string, allowedUserIds: unknown) {
+    const policy = this.oracle.getDocumentPolicy(documentId);
+    const owner = policy?.ownerUserId;
+    const updated = this.oracle.updateDocumentAcl(
+      documentId,
+      sanitizeUserIds(allowedUserIds).filter((id) => id !== owner)
+    );
+    this.persist();
+    return updated;
+  }
+
+  public async listPoliciesForUser(userId: string) {
+    const all = await this.authority.listRegisteredPolicies();
+    return all.filter(
+      (p) => p.ownerUserId === userId || (p.allowedUserIds ?? []).includes(userId)
+    );
+  }
+
+  public isSubjectRequired(): boolean {
+    return this.requireSubject;
   }
 
   public async processAuthorizationRequest(request: AuthorizationRequest) {
@@ -204,14 +299,14 @@ export class DurableAuthorityService {
     return result;
   }
 
-  public async releaseDocumentWrapSecretForGrant(grant: AuthorizationGrant) {
-    const secret = await this.authority.releaseDocumentWrapSecretForGrant(grant);
+  public async releaseDocumentWrapSecretForGrant(grant: AuthorizationGrant, subjectUserId?: string) {
+    const secret = await this.authority.releaseDocumentWrapSecretForGrant(grant, subjectUserId);
     this.persist();
     return secret;
   }
 
-  public async commitViewOnce(documentId: string, grantId: string) {
-    const ok = await this.authority.commitViewOnce(documentId, grantId);
+  public async commitViewOnce(documentId: string, grantId: string, subjectUserId?: string) {
+    const ok = await this.authority.commitViewOnce(documentId, grantId, subjectUserId);
     this.persist();
     return ok;
   }

@@ -20,6 +20,7 @@ import {
   type UsbValidationPreference,
 } from '../lib/security-device-prefs.ts';
 import { cloudHsmAdapterFromPrefs } from '../device/cloud-hsm-adapter.ts';
+import UsbHsmIdentityCard from './UsbHsmIdentityCard.tsx';
 
 const CLOUD_VENDORS: Array<{ value: CloudHsmVendor; label: string }> = [
   { value: 'aws-kms', label: 'AWS KMS' },
@@ -102,6 +103,8 @@ export default function SecurityDevicesPanel() {
           No sustituye al Gatekeeper ni emite grants TDCP. La USB no inicia sesión: la cuenta se
           autentica por separado; el hardware solo se vincula o valida después.
         </p>
+
+        <UsbHsmIdentityCard />
 
         <section className="mb-5 space-y-3">
           <h3 className="text-[11px] font-bold tracking-wider text-white/50 uppercase">
@@ -343,16 +346,17 @@ export default function SecurityDevicesPanel() {
           <div className="flex min-w-0 items-center gap-2">
             <CreditCard className="h-4 w-4 shrink-0 text-white/60" />
             <div>
-              <div className="text-xs font-bold text-white">NFC</div>
+              <div className="text-xs font-bold text-white">NFC (retirado)</div>
               <div className="text-[10px] text-white/40">
-                Opcional. Desactivado por defecto y fuera del camino principal.
+                Reemplazado por USB-HSM. La credencial es tu cuenta y el factor físico, tu llave USB.
               </div>
             </div>
           </div>
           <input
             type="checkbox"
-            checked={prefs.nfcEnabled}
-            onChange={(e) => patch({ nfcEnabled: e.target.checked })}
+            checked={false}
+            disabled
+            readOnly
             className="h-4 w-4 accent-slate-400"
           />
         </label>

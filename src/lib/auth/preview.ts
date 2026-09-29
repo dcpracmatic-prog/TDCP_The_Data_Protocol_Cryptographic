@@ -16,9 +16,9 @@
  * client (preview-only, `*.grok-sandbox.com`) — rotate it by regenerating the
  * broker env var and this constant together.
  */
-export const PREVIEW_CLIENT_ID = "grok_preview";
-export const PREVIEW_CLIENT_SECRET =
-  "8bcdb7fc5a33874ad933ca568918d5790388a0795e44c4d1dea691f801b17ec5";
+// TDCP: the shared preview client secret was removed from source control.
+// Inject GROK_AUTH_CLIENT_ID / GROK_AUTH_CLIENT_SECRET via env if you ever
+// federate through the Grok broker again.
 
 /** The shared auth broker issuer (OIDC discovery lives under it). */
 export const GROK_ISSUER_DEFAULT = "https://auth.grok.me";

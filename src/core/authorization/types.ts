@@ -17,13 +17,23 @@ export interface DeviceIdentity {
   hardwareBacked: boolean;
   platform: string;
   fingerprintDigest: string;
-  attestationType: 'MOCK_DEVELOPMENT' | 'TPM_SIMULATION' | 'WEBAUTHN_AUTHENTICATOR';
+  attestationType:
+    | 'MOCK_DEVELOPMENT'
+    | 'TPM_SIMULATION'
+    | 'WEBAUTHN_AUTHENTICATOR'
+    | 'USB_HSM_WEBAUTHN'
+    | 'BROWSER_SESSION';
 }
 
 export interface UserCredential {
   credentialId: string;
   holderName: string;
-  credentialType: 'NFC_CARD' | 'SMART_CARD' | 'MOCK_TOKEN' | 'FIDO2_AUTHENTICATOR';
+  credentialType:
+    | 'ACCOUNT_SESSION'
+    | 'NFC_CARD'
+    | 'SMART_CARD'
+    | 'MOCK_TOKEN'
+    | 'FIDO2_AUTHENTICATOR';
   assignedRole: 'OPERATOR' | 'SECURITY_OFFICER' | 'ANALYST' | 'AUDITOR';
   publicKey?: string;
   isSimulated: boolean;
@@ -39,15 +49,21 @@ export interface AuthorizationRequest {
   challenge: string; // Cryptographic random nonce from Gatekeeper
   requestedOperation: TDCPRequestedOperation;
   timestamp: number; // Client requested time (untrusted)
+  /**
+   * Verified end-user id. Set ONLY by the Authority from a validated user
+   * session token — any client-supplied value is discarded server-side.
+   */
+  subjectUserId?: string;
+  /**
+   * WebAuthn assertion from the user's USB-HSM over usbHsmChallenge(...).
+   * Verified by the Authority; the client-sent value is only input.
+   */
+  usbHsmAssertion?: import('./usb-hsm.ts').UsbHsmAssertion;
+  /** Set ONLY by the Authority after verifying `usbHsmAssertion`. */
+  verifiedUsbHsm?: { deviceId: string; userVerified: boolean };
   policyContext?: {
     location?: string;
-    /** @deprecated Untrusted client claim — ignored by policy engine. */
     biometricVerified?: boolean;
-    /**
-     * Set only by a trusted control-plane step after verifying WebAuthn / device
-     * assertion. Client-supplied true without verification must not be accepted.
-     */
-    biometricAssertionVerified?: boolean;
     anomalyScore?: number;
   };
 }
@@ -69,6 +85,8 @@ export interface AuthorizationGrant {
   allowExtraction: boolean;
   forensicWatermarkRequired: boolean;
   oracleKeyId: string;
+  /** Verified end-user the grant was issued to (signed). Absent in legacy / in-process mode. */
+  subjectUserId?: string;
   signature: string; // Base64 ECDSA P-256 signature
 }
 
@@ -105,6 +123,8 @@ export function canonicalizeGrant(grant: Omit<AuthorizationGrant, 'signature'>):
     `ONE_TIME:${grant.oneTimeUse ? '1' : '0'}`,
     `EXTRACT:${grant.allowExtraction ? '1' : '0'}`,
     `WATERMARK:${grant.forensicWatermarkRequired ? '1' : '0'}`,
-    `ORACLE:${grant.oracleKeyId}`
+    `ORACLE:${grant.oracleKeyId}`,
+    // Appended only when bound to a user, so legacy grants keep their exact encoding.
+    ...(grant.subjectUserId ? [`SUBJECT:${grant.subjectUserId}`] : []),
   ].join('\n');
 }

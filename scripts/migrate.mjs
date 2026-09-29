@@ -13,6 +13,7 @@
  * the same files at startup instead (see src/lib/db.ts).
  */
 import { readdir, readFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import pg from "pg";
@@ -24,6 +25,20 @@ if (!databaseUrl) {
     "[migrate] DATABASE_URL not set — skipping (the PGLite fallback migrates itself).",
   );
   process.exit(0);
+}
+
+/** Mirrors src/lib/pg-config.ts (TLS for Supabase; CA-verified when DATABASE_CA_CERT is set). */
+function sslOptions(url) {
+  const isLocal = /@(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(url);
+  if (isLocal || process.env.DATABASE_SSL === "disable") return { connectionString: url };
+  const caPath = process.env.DATABASE_CA_CERT?.trim();
+  const connectionString = url.replace(/([?&])sslmode=[^&]*&?/, "$1").replace(/[?&]$/, "");
+  return {
+    connectionString,
+    ssl: caPath
+      ? { ca: readFileSync(caPath, "utf8"), rejectUnauthorized: true }
+      : { rejectUnauthorized: false },
+  };
 }
 
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "migrations");
@@ -42,7 +57,7 @@ async function main() {
     return;
   }
 
-  const pool = new pg.Pool({ connectionString: databaseUrl, max: 1 });
+  const pool = new pg.Pool({ ...sslOptions(databaseUrl), max: 1 });
   const client = await pool.connect();
   try {
     await client.query(

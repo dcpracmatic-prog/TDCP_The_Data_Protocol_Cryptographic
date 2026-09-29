@@ -8,7 +8,7 @@
 |---|---|
 | USB binding | activado |
 | HSM | `none` |
-| NFC | desactivado |
+| NFC | retirado (reemplazado por USB-HSM) |
 | Validación colaborativa | desactivada |
 | Validación USB | persistente |
 
@@ -46,9 +46,12 @@ Cuando `collaborativeUsbValidation=true`, la aplicación debe forzar `usbValidat
 
 Objetivo: comprobar si la USB está autorizada **sin** registrar binding permanente en la cuenta.
 
-## NFC
+## NFC (retirado → USB-HSM)
 
-Proveedor opcional. No participa automáticamente en login, enrollment USB ni recovery.
+La credencial NFC fue reemplazada por el **USB-HSM**: la credencial es la cuenta verificada
+por el Authority (`ACCOUNT-<userId>`) y el factor físico es una llave USB FIDO2 con elemento
+seguro registrada a la cuenta. Ver [HSM_USB.md](./HSM_USB.md). El interruptor NFC queda
+deshabilitado en la UI.
 
 ## Separación de planos
 

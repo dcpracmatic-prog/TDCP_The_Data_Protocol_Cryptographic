@@ -102,21 +102,15 @@ export class DeterministicPolicyEngine {
       };
     }
 
-    // Client-supplied policyContext.biometricVerified is NOT trusted (PoC: forged claim).
-    // Presence must be proven via Authority-verified assertion (WebAuthn / device signature).
-    // Until that path exists, CRITICAL / ULTRA_CRITICAL require
-    // policyContext.biometricAssertionVerified === true set only by a trusted control-plane step.
-    const biometricProven =
-      request.policyContext?.biometricAssertionVerified === true;
     if (
       (policyLevel === 'CRITICAL' || policyLevel === 'ULTRA_CRITICAL') &&
-      !biometricProven
+      !request.policyContext?.biometricVerified
     ) {
       return {
         allowed: false,
         rejectionCode: 'BIOMETRIC_REQUIRED',
         rejectionReason:
-          'La política CRITICAL / ULTRA_CRITICAL exige aserción de presencia verificada por Authority (no basta un flag de cliente).',
+          'La política CRITICAL / ULTRA_CRITICAL exige verificación biométrica de presencia antes de emitir un grant.',
         allowExtraction: false,
         forensicWatermarkRequired: true,
         validityWindowSeconds: 0,

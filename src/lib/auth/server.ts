@@ -30,7 +30,7 @@
  * a verified id via `@/lib/auth/middleware`.
  */
 import { betterAuth } from "better-auth";
-import { bearer, genericOAuth } from "better-auth/plugins";
+import { bearer, genericOAuth, jwt } from "better-auth/plugins";
 import { tanstackStartCookies } from "better-auth/tanstack-start";
 import { getCookie } from "@tanstack/react-start/server";
 import { randomBytes } from "node:crypto";
@@ -40,12 +40,9 @@ import { emailAndPasswordEnabled } from "./email-password.ts";
 import { GATE_PROVIDER_ID, gateIdentitySessions } from "./gate-session.server.ts";
 import { GROK_PROVIDERS } from "./providers.ts";
 import { pgliteDialect } from "./pglite-dialect.ts";
-import {
-  GROK_ISSUER_DEFAULT,
-  PREVIEW_ALLOWED_HOSTS,
-  PREVIEW_CLIENT_ID,
-  PREVIEW_CLIENT_SECRET,
-} from "./preview.ts";
+import { GROK_ISSUER_DEFAULT, PREVIEW_ALLOWED_HOSTS } from "./preview.ts";
+import { pgPoolConfig } from "../pg-config.ts";
+import { mailerConfigured, sendPasswordResetEmail, sendVerificationEmail } from "./mailer.server.ts";
 
 // Kick (and share) PGLite bootstrap as soon as the auth server module loads.
 void ensureDbReady();
@@ -78,12 +75,16 @@ const authDisabled = env("VITE_AUTH_ENABLED") === "false";
 // otherwise fall back to the shared live-preview client, which the broker accepts
 // for any `*.grok-sandbox.com` callback (see `./preview`).
 const grokIssuer = env("GROK_AUTH_ISSUER") ?? GROK_ISSUER_DEFAULT;
-const grokClientId = env("GROK_AUTH_CLIENT_ID") ?? PREVIEW_CLIENT_ID;
-const grokClientSecret = env("GROK_AUTH_CLIENT_SECRET") ?? PREVIEW_CLIENT_SECRET;
+// TDCP: no baked-in preview client. The Grok broker is used ONLY when a per-app
+// client is explicitly injected via env; otherwise sign-in is local
+// email/password stored in this app's own Postgres (Supabase) database.
+const grokClientId = env("GROK_AUTH_CLIENT_ID");
+const grokClientSecret = env("GROK_AUTH_CLIENT_SECRET");
+const grokOAuthConfigured = Boolean(grokClientId && grokClientSecret);
 
-/** True when federated sign-in is active (real auth is enforced). */
+/** True when real auth is enforced (email/password and/or federated OAuth). */
 export const authConfigured =
-  !authDisabled && Boolean(grokClientId && grokClientSecret);
+  !authDisabled && (emailAndPasswordEnabled || grokOAuthConfigured);
 
 // This app's own Better Auth origin. When deployed the deployer injects the
 // public URL. In the sandbox live preview there's no fixed URL (each preview gets
@@ -127,6 +128,21 @@ const trustedOrigins: string[] = explicitBaseURL
 
 const databaseUrl = env("DATABASE_URL");
 
+if (process.env.NODE_ENV === "production" && !mailerConfigured()) {
+  console.warn("[auth] RESEND_API_KEY / EMAIL_FROM no configurados: no se enviarán correos de verificación ni de restablecimiento.");
+}
+
+/**
+ * Identity tokens for the TDCP Authority. `GET /api/auth/token` returns a
+ * 5-minute JWT (sub = user id) signed with a key kept in the `jwks` table
+ * (private key encrypted with BETTER_AUTH_SECRET); `GET /api/auth/jwks`
+ * publishes the public keys. The Authority must be configured with the same
+ * issuer (TDCP_USER_ISSUER) and audience (TDCP_USER_AUDIENCE).
+ */
+export const TDCP_USER_TOKEN_ISSUER =
+  env("TDCP_USER_ISSUER") ?? explicitBaseURL ?? "http://localhost:8080";
+export const TDCP_USER_TOKEN_AUDIENCE = env("TDCP_USER_AUDIENCE") ?? "tdcp-authority";
+
 // Static broker OAuth endpoints (skip OIDC discovery on every sign-in / callback).
 // Discovery would cost an extra network hop to the broker before the popup can
 // even redirect to Google/X — the live-preview popup felt stuck on the app for
@@ -142,7 +158,7 @@ const grokUserInfoUrl = `${issuerBase}/api/auth/oauth2/userinfo`;
 // schema from `migrations/auth/0001_auth.sql`, copied into `migrations/` when
 // the app turns sign-in on.
 const database = databaseUrl
-  ? new Pool({ connectionString: databaseUrl })
+  ? new Pool(pgPoolConfig(databaseUrl))
   : { dialect: pgliteDialect(() => getPglite()), type: "postgres" as const };
 
 /** Session token cookie name — also read by the live-preview popup completion page. */
@@ -150,7 +166,7 @@ export const SESSION_TOKEN_COOKIE = "__Host-grok-auth.session_token";
 
 // Built separately so the `betterAuth({...})` call stays easy to edit without
 // breaking brackets (models often trip on the conditional plugin spread).
-const grokOAuthPlugin = authConfigured
+const grokOAuthPlugin = !authDisabled && grokOAuthConfigured
   ? genericOAuth({
       config: GROK_PROVIDERS.map(({ providerId, idp }) => ({
         providerId,
@@ -211,7 +227,50 @@ export const auth = betterAuth({
   session: { cookieCache: { enabled: true, maxAge: 300 } },
 
   // Local email/password — toggled only via `./email-password` (not a plugin).
-  ...(emailAndPasswordEnabled ? { emailAndPassword: { enabled: true } } : {}),
+  ...(emailAndPasswordEnabled
+    ? {
+        emailAndPassword: {
+          enabled: true,
+          minPasswordLength: 8,
+          maxPasswordLength: 128,
+          // Sign the user in right after sign-up. Email ownership is verified by
+          // link (below) and required for being found by email when sharing.
+          // Set TDCP_REQUIRE_EMAIL_VERIFICATION=true to block sign-in until verified.
+          autoSignIn: env("TDCP_REQUIRE_EMAIL_VERIFICATION") !== "true",
+          requireEmailVerification: env("TDCP_REQUIRE_EMAIL_VERIFICATION") === "true",
+          // Reset links expire after 30 min; all other sessions are revoked on reset.
+          resetPasswordTokenExpiresIn: 60 * 30,
+          revokeSessionsOnPasswordReset: true,
+          sendResetPassword: async ({ user, url }) => {
+            await sendPasswordResetEmail({ to: user.email, name: user.name, url });
+          },
+        },
+        emailVerification: {
+          // Resend (RESEND_API_KEY + EMAIL_FROM). In dev without a key the link
+          // is printed to the server console.
+          sendOnSignUp: true,
+          sendOnSignIn: env("TDCP_REQUIRE_EMAIL_VERIFICATION") === "true",
+          autoSignInAfterVerification: true,
+          expiresIn: 60 * 60 * 24,
+          sendVerificationEmail: async ({ user, url }) => {
+            await sendVerificationEmail({ to: user.email, name: user.name, url });
+          },
+        },
+      }
+    : {}),
+
+  // Brute-force protection on the auth endpoints (Better Auth built-in limiter).
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 100,
+    customRules: {
+      "/sign-in/email": { window: 60, max: 10 },
+      "/sign-up/email": { window: 60, max: 5 },
+      "/request-password-reset": { window: 300, max: 3 },
+      "/send-verification-email": { window: 300, max: 3 },
+    },
+  },
 
   // `__Host-` prefixed cookies: the browser REFUSES any same-named cookie that
   // carries a `Domain` attribute, so a sibling `*.grok.me` app cannot "toss" a
@@ -245,6 +304,24 @@ export const auth = betterAuth({
     // fires when an Authorization header is present, so the cookie path
     // (deployed apps) is unaffected.
     bearer(),
+
+    jwt({
+      jwt: {
+        issuer: TDCP_USER_TOKEN_ISSUER,
+        audience: TDCP_USER_TOKEN_AUDIENCE,
+        expirationTime: "5m",
+        // Minimal claims — the Authority only needs the stable user id.
+        definePayload: ({ user }) => ({ email: user.email, email_verified: user.emailVerified === true }),
+      },
+      jwks: {
+        keyPairConfig: { alg: "EdDSA", crv: "Ed25519" },
+        rotationInterval: 60 * 60 * 24 * 90,
+        gracePeriod: 60 * 60 * 24 * 7,
+      },
+      // Don't attach `set-auth-jwt` to every get-session response; the client
+      // asks for a token explicitly when it talks to the Authority.
+      disableSettingJwtHeader: true,
+    }),
 
     // Bridges Better Auth's Set-Cookie into TanStack Start responses. MUST be
     // last so it runs after every other plugin's hooks.

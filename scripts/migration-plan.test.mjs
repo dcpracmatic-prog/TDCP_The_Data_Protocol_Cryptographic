@@ -56,9 +56,12 @@ test("non-.sql entries are dropped (readdir also yields the auth/ directory)", (
   assert.deepEqual(pendingMigrations(["auth", "README.md"], []), []);
 });
 
-test("the auth schema ships outside the globbed directory", () => {
+test("sign-in is on: the auth schema is copied up and applied first", () => {
+  // TDCP enables email/password accounts, so migrations/0001_auth.sql is the
+  // copied-up Better Auth schema and must run before the app tables.
   const migrationsDir = join(projectRoot(), "migrations");
-  assert.deepEqual(pendingMigrations(readdirSync(migrationsDir), []), []);
+  const plan = pendingMigrations(readdirSync(migrationsDir), []).map((m) => m.name);
+  assert.equal(plan[0], "0001_auth.sql");
   assert.ok(readdirSync(join(migrationsDir, "auth")).includes("0001_auth.sql"));
 });
 

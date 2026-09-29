@@ -26,6 +26,8 @@ import {
 import { useGoogleAuth } from '../lib/googleDriveContext.tsx';
 import { evaluatePasswordStrength } from '../lib/password-strength.ts';
 import { tdcpRuntime } from '../runtime/tdcp-runtime.ts';
+import { resolveShareRecipients } from '../lib/accounts.functions.ts';
+import { hasUserTokenSource } from '../authority/user-token.ts';
 import type { PolicyLevel } from '../core/authorization/types.ts';
 import type { TDCPPackage } from '../core/package/package-format.ts';
 import CollapsibleSection from './CollapsibleSection.tsx';
@@ -64,6 +66,9 @@ export default function EncryptPanel() {
   const [blurMode, setBlurMode] = useState(false);
   const [allowExtraction, setAllowExtraction] = useState(false);
   const [viewOnce, setViewOnce] = useState(false);
+  /** Emails or TDCP ids (DCP-USR-…) allowed to open the package, besides me. */
+  const [shareWith, setShareWith] = useState('');
+  const [requireUsbHsm, setRequireUsbHsm] = useState(false);
   const [logs, setLogs] = useState('>_ ESPERANDO POLÍTICA TDCP Y REGISTRO EN ORACLE...');
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedInstructions, setCopiedInstructions] = useState(false);
@@ -147,6 +152,33 @@ export default function EncryptPanel() {
       const summaryItems: string[] = [`Modo de protección: ${modeMeta.label}`];
 
       if (modeMeta.usesTdcp) {
+        let allowedUserIds: string[] | undefined;
+        const recipients = shareWith
+          .split(/[\s,;]+/)
+          .map((r) => r.trim())
+          .filter(Boolean);
+        if (recipients.length > 0) {
+          if (!hasUserTokenSource() || tdcpRuntime.authority.kind !== 'HTTP_REMOTE') {
+            throw new Error(
+              'Compartir con usuarios requiere sesión iniciada y un Authority remoto (VITE_TDCP_AUTHORITY_URL).'
+            );
+          }
+          const { resolved, notFound } = await resolveShareRecipients({ data: { recipients } });
+          if (notFound.length > 0) {
+            throw new Error(`Sin cuenta TDCP: ${notFound.join(', ')}. Pídeles que se registren primero.`);
+          }
+          allowedUserIds = resolved.map((r) => r.userId);
+          setLogs(
+            (prev) =>
+              prev + `\n[TDCP] Acceso compartido con: ${resolved.map((r) => r.label).join(', ') || '(solo tú)'}`
+          );
+        }
+        if (requireUsbHsm && tdcpRuntime.authority.kind !== 'HTTP_REMOTE') {
+          throw new Error('Exigir USB-HSM requiere sesión iniciada y un Authority remoto.');
+        }
+        if (requireUsbHsm || policyLevel === 'CRITICAL' || policyLevel === 'ULTRA_CRITICAL') {
+          setLogs((prev) => prev + '\n[TDCP] Apertura solo con USB-HSM registrado (firma por solicitud + PIN).');
+        }
         setLogs((prev) => prev + '\n[TDCP] createPackage() + registro de política en Authority/Oracle.');
         const created = await tdcpRuntime.createPackage({
           plaintext,
@@ -157,6 +189,8 @@ export default function EncryptPanel() {
           allowExtraction,
           expirationDays: daysRestriction ? days : undefined,
           viewOnce,
+          allowedUserIds,
+          requireUsbHsm,
           watermarkRequired: watermark,
           blurMode,
         });
@@ -758,6 +792,39 @@ La contraseña es un factor adicional, no una llave de apertura.`;
                     className="h-4 w-4 rounded bg-white/5 text-emerald-500"
                   />
                   <span className="text-sm text-emerald-400">Permitir EXTRACT con grant específico</span>
+                </label>
+                <div className="space-y-1.5">
+                  <label htmlFor="tdcp-share-with" className="text-sm font-medium text-white/80">
+                    Compartir con (correo o ID DCP-USR)
+                  </label>
+                  <input
+                    id="tdcp-share-with"
+                    type="text"
+                    value={shareWith}
+                    onChange={(e) => setShareWith(e.target.value)}
+                    placeholder="ana@empresa.com, DCP-USR-1234-ABCD"
+                    autoComplete="off"
+                    className="w-full rounded border border-white/15 bg-white/5 p-2 text-sm text-white placeholder:text-white/30"
+                  />
+                  <p className="text-xs text-white/50">
+                    Solo tú y estas cuentas podrán pedir autorización al Authority. Vacío = solo tú.
+                  </p>
+                </div>
+                <label className="flex cursor-pointer items-start gap-3">
+                  <input
+                    id="tdcp-require-usb-hsm"
+                    type="checkbox"
+                    checked={requireUsbHsm || policyLevel === 'CRITICAL' || policyLevel === 'ULTRA_CRITICAL'}
+                    disabled={policyLevel === 'CRITICAL' || policyLevel === 'ULTRA_CRITICAL'}
+                    onChange={(e) => setRequireUsbHsm(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded bg-white/5 text-cyan-500"
+                  />
+                  <span className="text-sm text-cyan-300">
+                    Exigir USB-HSM para abrir
+                    <span className="block text-xs text-white/50">
+                      Cada destinatario debe tocar su llave registrada. Siempre activo en CRITICAL / ULTRA_CRITICAL.
+                    </span>
+                  </span>
                 </label>
               </div>
             </div>

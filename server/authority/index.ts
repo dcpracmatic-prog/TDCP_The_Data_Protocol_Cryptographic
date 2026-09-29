@@ -16,6 +16,10 @@
  *   TDCP_OIDC_ISSUER / TDCP_OIDC_AUDIENCE / TDCP_OIDC_JWKS_URL / TDCP_OIDC_ADMIN_CLAIM
  *   TDCP_MTLS_CA_FILE / TDCP_MTLS_ALLOWED_CNS
  *   TDCP_AUTHORITY_TLS_CERT_FILE / TDCP_AUTHORITY_TLS_KEY_FILE — enable HTTPS
+ *
+ * End-user auth (see docs/AUTHORITY_USER_AUTH.md):
+ *   TDCP_USER_AUTH=off|required  TDCP_USER_JWKS_URL  TDCP_USER_ISSUER  TDCP_USER_AUDIENCE
+ *   TDCP_CORS_ORIGINS — comma-separated allowed browser origins
  */
 
 import { join } from 'node:path';
@@ -27,7 +31,7 @@ const dataDir =
   process.env.TDCP_AUTHORITY_DATA_DIR || join(process.cwd(), 'data', 'authority');
 
 const adminAuth = loadAdminAuthConfigFromEnv();
-const { port, host, adminTokenConfigured, adminAuthMode, tlsEnabled } =
+const { port, host, adminTokenConfigured, adminAuthMode, tlsEnabled, userAuthMode } =
   await startAuthorityHttpServer({ dataDir, adminAuth });
 
 const backend = readSigningBackendFromEnv();
@@ -38,6 +42,7 @@ console.log(
 console.log(`[tdcp-authority] data dir: ${dataDir}`);
 console.log(`[tdcp-authority] signing backend: ${backend}`);
 console.log(`[tdcp-authority] admin auth mode: ${adminAuthMode}`);
+console.log(`[tdcp-authority] user auth mode: ${userAuthMode}`);
 if (adminAuthMode === 'token') {
   console.log(
     `[tdcp-authority] admin token: ${adminTokenConfigured ? 'configured' : 'NOT configured (admin APIs return 503)'}`

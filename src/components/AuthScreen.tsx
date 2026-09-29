@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth, extractDriveFolderId } from '../lib/authContext.tsx';
 import { 
   Lock, KeyRound, Mail, User, ShieldCheck, Sparkles, RefreshCw, 
-  ArrowRight, ShieldAlert, CheckCircle2, HelpCircle, Eye, EyeOff, Fingerprint, ChevronRight,
+  ArrowRight, ShieldAlert, CheckCircle2, Eye, EyeOff, Fingerprint, ChevronRight,
   HardDrive, FolderOpen, Link as LinkIcon
 } from 'lucide-react';
 
@@ -48,17 +48,14 @@ function DcpCrystalIcon({ className = "w-14 h-14", svgStyle }: { className?: str
   );
 }
 
-const SECURITY_QUESTIONS = [
-  '¿Cuál fue el nombre de tu primera mascota?',
-  '¿En qué ciudad naciste?',
-  '¿Cuál es el modelo de tu primer vehículo?',
-  '¿Cuál es tu libro o película favorita?',
-  '¿Palabra clave secreta de seguridad?'
-];
-
 export default function AuthScreen() {
-  const { login, register, recoverPassword, generateCustomUserId } = useAuth();
-  const [mode, setMode] = useState<'login' | 'register' | 'recover'>('login');
+  const { login, register, requestPasswordReset, resetPassword, generateCustomUserId } = useAuth();
+  // Password-reset links land on /?reset=1&token=... (Better Auth redirect).
+  const [resetToken] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return new URLSearchParams(window.location.search).get('token');
+  });
+  const [mode, setMode] = useState<'login' | 'register' | 'recover'>(() => (resetToken ? 'recover' : 'login'));
 
   // Form States
   const [email, setEmail] = useState('');
@@ -67,8 +64,6 @@ export default function AuthScreen() {
   const [name, setName] = useState('');
   const [customId, setCustomId] = useState('');
   const [driveFolderLink, setDriveFolderLink] = useState('');
-  const [securityQuestion, setSecurityQuestion] = useState(SECURITY_QUESTIONS[0]);
-  const [securityAnswer, setSecurityAnswer] = useState('');
   const [newPassword, setNewPassword] = useState('');
 
   // UI state
@@ -127,11 +122,6 @@ export default function AuthScreen() {
       return;
     }
 
-    if (!securityAnswer.trim()) {
-      setErrorMsg('Por favor introduce una respuesta de seguridad para recuperar tu cuenta.');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       const res = await register({
@@ -139,8 +129,6 @@ export default function AuthScreen() {
         email,
         customId,
         password,
-        securityQuestion,
-        securityAnswer,
         driveFolderLink
       });
 
@@ -158,31 +146,31 @@ export default function AuthScreen() {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
-
-    if (newPassword !== confirmPassword) {
-      setErrorMsg('Las nuevas contraseñas no coinciden.');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
-      const res = await recoverPassword({
-        email,
-        securityAnswer,
-        newPassword
-      });
+      if (!resetToken) {
+        const res = await requestPasswordReset(email);
+        if (res.success) {
+          setSuccessMsg('Si el correo está registrado, recibirás un enlace para restablecer tu contraseña (válido 30 minutos).');
+        } else {
+          setErrorMsg(res.error || 'No se pudo enviar el enlace.');
+        }
+        return;
+      }
 
+      if (newPassword !== confirmPassword) {
+        setErrorMsg('Las nuevas contraseñas no coinciden.');
+        return;
+      }
+      const res = await resetPassword(resetToken, newPassword);
       if (res.success) {
-        setSuccessMsg('¡Contraseña actualizada exitosamente! Ya puedes iniciar sesión con tu nueva clave.');
+        setSuccessMsg('¡Contraseña actualizada! Ya puedes iniciar sesión con tu nueva clave.');
+        window.history.replaceState(null, '', window.location.pathname);
         setTimeout(() => {
-          setMode('login');
-          setPassword('');
-          setConfirmPassword('');
-          setNewPassword('');
-          setSuccessMsg(null);
+          window.location.reload();
         }, 2200);
       } else {
-        setErrorMsg(res.error || 'No se pudo recuperar la contraseña.');
+        setErrorMsg(res.error || 'No se pudo restablecer la contraseña.');
       }
     } catch {
       setErrorMsg('Error inesperado al procesar la recuperación.');
@@ -436,7 +424,7 @@ export default function AuthScreen() {
                   required
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder="Mínimo 8 caracteres"
                   className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 focus:border-pink-500/50 outline-none"
                 />
               </div>
@@ -453,32 +441,6 @@ export default function AuthScreen() {
                   className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 focus:border-pink-500/50 outline-none"
                 />
               </div>
-            </div>
-
-            {/* PREGUNTA DE SEGURIDAD PARA RECUPERACIÓN */}
-            <div className="pt-2 border-t border-white/10 space-y-2">
-              <div className="flex items-center gap-1.5 text-[11px] font-bold text-pink-300">
-                <HelpCircle className="w-3.5 h-3.5" /> Clave de Respaldo / Recuperación
-              </div>
-              <select
-                value={securityQuestion}
-                onChange={e => setSecurityQuestion(e.target.value)}
-                className="w-full bg-black/50 border border-white/10 rounded-lg px-2.5 py-1.5 text-[11px] text-white/80 focus:border-pink-500/50 outline-none"
-              >
-                {SECURITY_QUESTIONS.map((q, idx) => (
-                  <option key={idx} value={q} className="bg-slate-900 text-white text-xs">
-                    {q}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="text"
-                required
-                value={securityAnswer}
-                onChange={e => setSecurityAnswer(e.target.value)}
-                placeholder="Tu respuesta secreta de recuperación"
-                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 focus:border-pink-500/50 outline-none"
-              />
             </div>
 
             <button
@@ -501,6 +463,7 @@ export default function AuthScreen() {
         {/* 3. FORMULARIO DE RECUPERAR CONTRASEÑA */}
         {mode === 'recover' && (
           <form onSubmit={handleRecoverSubmit} className="space-y-3.5">
+            {!resetToken && (
             <div>
               <label className="block text-[11px] uppercase font-bold text-white/60 mb-1 flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-indigo-400" /> Correo Registrado
@@ -514,21 +477,9 @@ export default function AuthScreen() {
                 className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 focus:border-indigo-500/50 outline-none"
               />
             </div>
+            )}
 
-            <div>
-              <label className="block text-[11px] uppercase font-bold text-white/60 mb-1 flex items-center gap-1.5">
-                <HelpCircle className="w-3.5 h-3.5 text-indigo-400" /> Respuesta Secreta de Recuperación
-              </label>
-              <input
-                type="text"
-                required
-                value={securityAnswer}
-                onChange={e => setSecurityAnswer(e.target.value)}
-                placeholder="Ingresa la respuesta que guardaste al registrarte"
-                className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 focus:border-indigo-500/50 outline-none"
-              />
-            </div>
-
+            {resetToken && (
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-[11px] uppercase font-bold text-white/60 mb-1 flex items-center gap-1">
@@ -539,7 +490,7 @@ export default function AuthScreen() {
                   required
                   value={newPassword}
                   onChange={e => setNewPassword(e.target.value)}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder="Mínimo 8 caracteres"
                   className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 focus:border-indigo-500/50 outline-none"
                 />
               </div>
@@ -557,6 +508,7 @@ export default function AuthScreen() {
                 />
               </div>
             </div>
+            )}
 
             <button
               type="submit"
@@ -568,7 +520,7 @@ export default function AuthScreen() {
               ) : (
                 <>
                   <KeyRound className="w-4 h-4" />
-                  <span>Restablecer y Actualizar Contraseña</span>
+                  <span>{resetToken ? 'Guardar Nueva Contraseña' : 'Enviar Enlace de Restablecimiento'}</span>
                 </>
               )}
             </button>
@@ -578,7 +530,7 @@ export default function AuthScreen() {
         {/* Security Footer Note */}
         <div className="mt-6 pt-4 border-t border-white/10 text-center">
           <p className="text-[10px] text-white/40 flex items-center justify-center gap-1">
-            <Lock className="w-3 h-3 text-purple-400" /> Cifrado Soberano SHA-256 / AES-256 en RAM Aislada
+            <Lock className="w-3 h-3 text-purple-400" /> Cuentas protegidas en servidor · contraseñas con hash scrypt
           </p>
         </div>
       </div>

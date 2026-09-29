@@ -30,8 +30,13 @@ function env(key: string): string | undefined {
   return v || undefined;
 }
 
+/**
+ * Grok platform gate identity (x-grok-identity header). TDCP: opt-in only —
+ * off unless GROK_GATE_IDENTITY=true, so a self-hosted deployment never trusts
+ * a platform header it does not sit behind.
+ */
 export function gateIdentityEnabled(): boolean {
-  return env("VITE_AUTH_ENABLED") !== "false";
+  return env("VITE_AUTH_ENABLED") !== "false" && env("GROK_GATE_IDENTITY") === "true";
 }
 
 export function gateTokenAudience(): string {

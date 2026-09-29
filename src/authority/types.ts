@@ -12,16 +12,17 @@ import type {
   DocumentRevocationState,
 } from '../core/authorization/types.ts';
 import type { RegisteredDocumentPolicy } from '../oracle/authorization-oracle.ts';
+import type { PolicyBinding } from '../channel/policy-binding.ts';
 
 export type AuthorityKind = 'IN_PROCESS' | 'HTTP_REMOTE';
 
 export interface AuthorityAuthResult {
   granted: boolean;
   grant?: AuthorizationGrant;
-  /** Signed workflow-channel budget for this grant (ChannelBudget plane). */
-  channelPolicyBinding?: import('../channel/channel-budget.ts').PolicyBinding;
   rejectionReason?: string;
   rejectionCode?: string;
+  /** Authority-signed channel policy bound to the one-time grant. */
+  channelPolicyBinding?: PolicyBinding;
 }
 
 /**
@@ -39,7 +40,8 @@ export interface AuthorizationAuthority {
   getKeyStoreKind(): string;
   isDevelopmentKeyStore(): boolean;
 
-  issueChallenge(): Promise<string>;
+  /** `subjectUserId` is only honored server-side (set from a verified session). */
+  issueChallenge(subjectUserId?: string): Promise<string>;
   isValidChallenge(challenge: string): Promise<boolean>;
 
   registerDocumentPolicy(policy: RegisteredDocumentPolicy): Promise<Uint8Array>;
@@ -47,8 +49,11 @@ export interface AuthorizationAuthority {
   listRegisteredPolicies(): Promise<RegisteredDocumentPolicy[]>;
 
   processAuthorizationRequest(request: AuthorizationRequest): Promise<AuthorityAuthResult>;
-  releaseDocumentWrapSecretForGrant(grant: AuthorizationGrant): Promise<Uint8Array | null>;
-  commitViewOnce(documentId: string, grantId: string): Promise<boolean>;
+  releaseDocumentWrapSecretForGrant(
+    grant: AuthorizationGrant,
+    subjectUserId?: string
+  ): Promise<Uint8Array | null>;
+  commitViewOnce(documentId: string, grantId: string, subjectUserId?: string): Promise<boolean>;
 
   revokeDocument(
     documentId: string,

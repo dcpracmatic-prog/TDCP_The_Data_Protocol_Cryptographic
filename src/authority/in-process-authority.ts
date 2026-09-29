@@ -48,8 +48,8 @@ export class InProcessAuthority implements AuthorizationAuthority {
     return this.oracle.isDevelopmentKeyStore();
   }
 
-  public async issueChallenge(): Promise<string> {
-    return this.oracle.issueChallenge();
+  public async issueChallenge(subjectUserId?: string): Promise<string> {
+    return this.oracle.issueChallenge(subjectUserId);
   }
 
   public async isValidChallenge(challenge: string): Promise<boolean> {
@@ -77,13 +77,18 @@ export class InProcessAuthority implements AuthorizationAuthority {
   }
 
   public async releaseDocumentWrapSecretForGrant(
-    grant: AuthorizationGrant
+    grant: AuthorizationGrant,
+    subjectUserId?: string
   ): Promise<Uint8Array | null> {
-    return this.oracle.releaseDocumentWrapSecretForGrant(grant);
+    return this.oracle.releaseDocumentWrapSecretForGrant(grant, subjectUserId);
   }
 
-  public async commitViewOnce(documentId: string, grantId: string): Promise<boolean> {
-    return this.oracle.commitViewOnce(documentId, grantId);
+  public async commitViewOnce(
+    documentId: string,
+    grantId: string,
+    subjectUserId?: string
+  ): Promise<boolean> {
+    return this.oracle.commitViewOnce(documentId, grantId, subjectUserId);
   }
 
   public async revokeDocument(

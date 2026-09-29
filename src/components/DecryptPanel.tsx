@@ -168,14 +168,28 @@ export default function DecryptPanel() {
     try {
       const cred = await tdcpRuntime.nfcProvider.readCredential();
       setCredentialReady(true);
-      setLogs((prev) => prev + `\n[NFC] ${tdcpRuntime.nfcProvider.providerName}\n     credentialId=${cred.credentialId} (${cred.isSimulated ? 'DEMO' : 'HW'})`);
+      const tag = tdcpRuntime.isUserBound() ? 'CUENTA' : 'CREDENCIAL DEMO';
+      setLogs((prev) => prev + `\n[${tag}] ${tdcpRuntime.nfcProvider.providerName}\n     credentialId=${cred.credentialId} (${cred.isSimulated ? 'DEMO' : 'verificada por Authority'})`);
     } catch (err: unknown) {
-      setLogs((prev) => prev + `\n[NFC FAIL] ${err instanceof Error ? err.message : String(err)}`);
+      setLogs((prev) => prev + `\n[CREDENCIAL FAIL] ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
   const bindDevice = async () => {
     try {
+      if (tdcpRuntime.usbHsm) {
+        const keys = await tdcpRuntime.usbHsm.list();
+        const active = keys.filter((k) => k.status === 'ACTIVE');
+        setDeviceReady(true);
+        setLogs(
+          (prev) =>
+            prev +
+            (active.length > 0
+              ? `\n[USB-HSM] ${active.length} llave(s) activa(s): ${active.map((k) => `${k.label} (${k.deviceId})`).join(', ')}\n     Si el documento lo exige (CRITICAL/ULTRA o "Exigir USB-HSM"), se pedirá tocar la llave y su PIN.`
+              : '\n[USB-HSM] Sin llave registrada. Los documentos que exigen USB-HSM serán rechazados; registra una en "Hardware & Identidad".')
+        );
+        return;
+      }
       const device = await tdcpRuntime.deviceProvider.getDeviceIdentity();
       setDeviceReady(true);
       setLogs(
@@ -218,7 +232,7 @@ export default function DecryptPanel() {
 
       try {
         const openResult = await client.open(stpRef.artifact_id, password);
-        if (!openResult.ok || !openResult.plaintext) {
+        if (!openResult.ok) {
           setLogs(
             (prev) =>
               prev +
@@ -552,7 +566,9 @@ export default function DecryptPanel() {
                         }`}
                       >
                         <CreditCard className="h-3.5 w-3.5" />
-                        {credentialReady ? 'Credencial OK' : 'Credencial NFC'}
+                        {credentialReady
+                          ? tdcpRuntime.isUserBound() ? 'Cuenta OK' : 'Credencial OK'
+                          : tdcpRuntime.isUserBound() ? 'Cuenta' : 'Credencial demo'}
                       </button>
                       <button
                         type="button"
@@ -564,7 +580,9 @@ export default function DecryptPanel() {
                         }`}
                       >
                         <Cpu className="h-3.5 w-3.5" />
-                        {deviceReady ? 'Dispositivo OK' : 'Dispositivo'}
+                        {deviceReady
+                          ? tdcpRuntime.isUserBound() ? 'USB-HSM OK' : 'Dispositivo OK'
+                          : tdcpRuntime.isUserBound() ? 'USB-HSM' : 'Dispositivo'}
                       </button>
                     </div>
                   </>
@@ -649,7 +667,7 @@ export default function DecryptPanel() {
                   <div className="mt-0.5 font-semibold">{credentialReady ? 'Lista' : 'Pendiente'}</div>
                 </div>
                 <div className={`rounded-lg border p-2 ${deviceReady ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-amber-500/30 bg-amber-500/5 text-amber-200/80'}`}>
-                  <div className="text-[9px] font-bold tracking-wider uppercase opacity-70">Dispositivo</div>
+                  <div className="text-[9px] font-bold tracking-wider uppercase opacity-70">{tdcpRuntime.isUserBound() ? 'USB-HSM' : 'Dispositivo'}</div>
                   <div className="mt-0.5 font-semibold">{deviceReady ? 'Ligado' : 'Pendiente'}</div>
                 </div>
               </div>

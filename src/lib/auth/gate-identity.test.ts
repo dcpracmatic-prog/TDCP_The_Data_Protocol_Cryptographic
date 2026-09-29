@@ -1,4 +1,4 @@
-import { describe, it } from "node:test";
+import { after, before, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync, type KeyObject } from "node:crypto";
 import { SignJWT, exportJWK, type JWK } from "jose";
@@ -211,6 +211,13 @@ describe("verifyGateIdentityToken", () => {
 });
 
 describe("gateIdentityFromHeaders", () => {
+  before(() => {
+    process.env.GROK_GATE_IDENTITY = "true";
+  });
+  after(() => {
+    delete process.env.GROK_GATE_IDENTITY;
+  });
+
   it("verifies the header token end to end and fails closed without it", async () => {
     const key = await makeKey("k1");
     const { fetchImpl } = staticJwks([key.jwk]);
@@ -378,10 +385,20 @@ describe("gateIdentityFromHeaders", () => {
 });
 
 describe("gateIdentityEnabled", () => {
-  it("is enabled by default with no gate env vars", () => {
+  it("is disabled by default (opt-in via GROK_GATE_IDENTITY=true)", () => {
     delete process.env.GROK_PROJECT_ID;
     delete process.env.GROK_GATE_ORIGIN;
-    assert.equal(gateIdentityEnabled(), true);
+    delete process.env.GROK_GATE_IDENTITY;
+    assert.equal(gateIdentityEnabled(), false);
+  });
+
+  it("is enabled when GROK_GATE_IDENTITY=true", () => {
+    process.env.GROK_GATE_IDENTITY = "true";
+    try {
+      assert.equal(gateIdentityEnabled(), true);
+    } finally {
+      delete process.env.GROK_GATE_IDENTITY;
+    }
   });
 
   it("is disabled when VITE_AUTH_ENABLED is false", () => {

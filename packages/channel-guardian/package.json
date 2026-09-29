@@ -13,7 +13,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --passWithNoTests 2>/dev/null || node --test test/*.test.js 2>/dev/null || echo 'Run: npm run build && node --test test/'",
+    "pretest": "npm run build",
+    "test": "node --test test/guardian.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "keywords": [

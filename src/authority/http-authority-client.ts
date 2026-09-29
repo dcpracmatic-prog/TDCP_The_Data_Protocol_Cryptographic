@@ -12,6 +12,11 @@ import type {
   DocumentRevocationState,
 } from '../core/authorization/types.ts';
 import type { RegisteredDocumentPolicy } from '../oracle/authorization-oracle.ts';
+import type { UsbHsmDeviceInfo } from '../core/authorization/usb-hsm.ts';
+import type {
+  PublicKeyCredentialCreationOptionsJSON,
+  RegistrationResponseJSON,
+} from '@simplewebauthn/browser';
 import { base64ToArrayBuffer, arrayBufferToBase64 } from '../core/crypto/primitives.ts';
 import type {
   AuthorityAuthResult,
@@ -28,7 +33,18 @@ export interface HttpAuthorityClientOptions {
    * ship this token in public browser builds for production.
    */
   adminToken?: string;
+  /**
+   * Short-lived end-user JWT (Better Auth `/api/auth/token`). When set, it is
+   * sent on every Gatekeeper call as `x-tdcp-user-token`, and document
+   * registration / revoke / restore use the owner-scoped endpoints instead of
+   * the admin ones — no admin token in the browser.
+   */
+  getUserToken?: () => Promise<string | null>;
+  /** Whether owner-scoped endpoints should be used right now (default: getUserToken set). */
+  isUserBound?: () => boolean;
 }
+
+export const USER_TOKEN_HEADER = 'x-tdcp-user-token';
 
 async function importSpkiPublicKey(spkiBase64: string): Promise<CryptoKey> {
   const spki = base64ToArrayBuffer(spkiBase64);
@@ -46,6 +62,8 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
   private readonly adminToken?: string;
+  private readonly getUserToken?: () => Promise<string | null>;
+  private readonly userBound: () => boolean;
   private cachedInfo: AuthorityPublicInfo | null = null;
   private cachedPublicKey: CryptoKey | null = null;
 
@@ -54,6 +72,14 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
     // Bind to globalThis — unbound fetch throws Illegal invocation in some browsers/bundles
     this.fetchImpl = options.fetchImpl ?? globalThis.fetch.bind(globalThis);
     this.adminToken = options.adminToken;
+    this.getUserToken = options.getUserToken;
+    const hasFetcher = Boolean(options.getUserToken);
+    this.userBound = options.isUserBound ?? (() => hasFetcher);
+  }
+
+  /** True when this client acts for a signed-in user (owner-scoped endpoints). */
+  public isUserBound(): boolean {
+    return this.userBound();
   }
 
   private async request<T>(
@@ -66,6 +92,10 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
     if (body !== undefined) headers['content-type'] = 'application/json';
     if (opts?.admin && this.adminToken) {
       headers['authorization'] = `Bearer ${this.adminToken}`;
+    }
+    if (!opts?.admin && this.getUserToken) {
+      const token = await this.getUserToken();
+      if (token) headers[USER_TOKEN_HEADER] = token;
     }
     const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
       method,
@@ -121,7 +151,8 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
     return this.cachedInfo?.developmentOnly ?? true;
   }
 
-  public async issueChallenge(): Promise<string> {
+  /** Subject is derived server-side from the user token; the argument is ignored. */
+  public async issueChallenge(_subjectUserId?: string): Promise<string> {
     const res = await this.request<{ challenge: string }>('POST', '/v1/challenge');
     return res.challenge;
   }
@@ -134,12 +165,14 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
   }
 
   public async registerDocumentPolicy(policy: RegisteredDocumentPolicy): Promise<Uint8Array> {
-    const res = await this.request<{ wrapSecretBase64: string }>(
-      'POST',
-      '/v1/documents/register',
-      policy,
-      { admin: true }
-    );
+    const res = this.isUserBound()
+      ? await this.request<{ wrapSecretBase64: string }>('POST', '/v1/documents', policy)
+      : await this.request<{ wrapSecretBase64: string }>(
+          'POST',
+          '/v1/documents/register',
+          policy,
+          { admin: true }
+        );
     return new Uint8Array(base64ToArrayBuffer(res.wrapSecretBase64));
   }
 
@@ -176,7 +209,8 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
   }
 
   public async releaseDocumentWrapSecretForGrant(
-    grant: AuthorizationGrant
+    grant: AuthorizationGrant,
+    _subjectUserId?: string
   ): Promise<Uint8Array | null> {
     try {
       const res = await this.request<{ wrapSecretBase64: string | null }>(
@@ -191,7 +225,11 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
     }
   }
 
-  public async commitViewOnce(documentId: string, grantId: string): Promise<boolean> {
+  public async commitViewOnce(
+    documentId: string,
+    grantId: string,
+    _subjectUserId?: string
+  ): Promise<boolean> {
     const res = await this.request<{ committed: boolean }>('POST', '/v1/view-once/commit', {
       documentId,
       grantId,
@@ -204,6 +242,13 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
     reason?: string,
     revokedBy?: string
   ): Promise<DocumentRevocationState> {
+    if (this.isUserBound()) {
+      return this.request<DocumentRevocationState>(
+        'POST',
+        `/v1/documents/${encodeURIComponent(documentId)}/revoke`,
+        { reason }
+      );
+    }
     return this.request<DocumentRevocationState>(
       'POST',
       '/v1/revoke',
@@ -213,6 +258,13 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
   }
 
   public async restoreDocument(documentId: string): Promise<DocumentRevocationState> {
+    if (this.isUserBound()) {
+      return this.request<DocumentRevocationState>(
+        'POST',
+        `/v1/documents/${encodeURIComponent(documentId)}/restore`,
+        {}
+      );
+    }
     return this.request<DocumentRevocationState>(
       'POST',
       '/v1/restore',
@@ -228,6 +280,55 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
       'GET',
       `/v1/documents/${encodeURIComponent(documentId)}/revocation`
     );
+  }
+
+  /** Documents the signed-in user owns or can open. */
+  public async listMyDocuments(): Promise<RegisteredDocumentPolicy[]> {
+    const res = await this.request<{ policies: RegisteredDocumentPolicy[] }>('GET', '/v1/me/documents');
+    return res.policies;
+  }
+
+  /** Owner-only: replace the list of users allowed to open the document. */
+  public async updateDocumentAcl(
+    documentId: string,
+    allowedUserIds: string[]
+  ): Promise<RegisteredDocumentPolicy> {
+    return this.request<RegisteredDocumentPolicy>(
+      'POST',
+      `/v1/documents/${encodeURIComponent(documentId)}/acl`,
+      { allowedUserIds }
+    );
+  }
+
+  // ── USB-HSM (the user's hardware ID) ────────────────────────────────────
+  public async listUsbHsm(): Promise<UsbHsmDeviceInfo[]> {
+    const res = await this.request<{ devices: UsbHsmDeviceInfo[] }>('GET', '/v1/me/usb-hsm');
+    return res.devices;
+  }
+
+  public async usbHsmRegistrationOptions(opts: {
+    label?: string;
+    replaceDeviceId?: string;
+  }): Promise<PublicKeyCredentialCreationOptionsJSON> {
+    return this.request('POST', '/v1/me/usb-hsm/registration-options', opts);
+  }
+
+  public async registerUsbHsm(response: RegistrationResponseJSON): Promise<UsbHsmDeviceInfo> {
+    return this.request('POST', '/v1/me/usb-hsm/register', { response });
+  }
+
+  public async usbHsmAuthenticationOptions(): Promise<{
+    rpId: string;
+    allowCredentials: Array<{ id: string; transports: string[] }>;
+  }> {
+    return this.request('POST', '/v1/me/usb-hsm/authentication-options', {});
+  }
+
+  public async changeUsbHsmStatus(
+    deviceId: string,
+    action: 'revoke' | 'suspend' | 'reactivate'
+  ): Promise<UsbHsmDeviceInfo> {
+    return this.request('POST', `/v1/me/usb-hsm/${encodeURIComponent(deviceId)}/${action}`, {});
   }
 
   public async listRevoked(): Promise<DocumentRevocationState[]> {

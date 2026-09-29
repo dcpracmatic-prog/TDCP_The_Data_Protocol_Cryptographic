@@ -31,6 +31,17 @@ services:
       - TDCP_AUTHORITY_TLS_KEY_FILE=${TDCP_AUTHORITY_TLS_KEY_FILE:-}
       - TDCP_MTLS_CA_FILE=${TDCP_MTLS_CA_FILE:-}
       - TDCP_MTLS_ALLOWED_CNS=${TDCP_MTLS_ALLOWED_CNS:-}
+      # End-user identity (Better Auth jwt plugin in the web app). Set
+      # TDCP_USER_AUTH=required in any deployment with accounts on.
+      - TDCP_USER_AUTH=${TDCP_USER_AUTH:-off}
+      - TDCP_USER_JWKS_URL=${TDCP_USER_JWKS_URL:-http://web:8080/api/auth/jwks}
+      - TDCP_USER_ISSUER=${TDCP_USER_ISSUER:-}
+      - TDCP_USER_AUDIENCE=${TDCP_USER_AUDIENCE:-tdcp-authority}
+      - TDCP_CORS_ORIGINS=${TDCP_CORS_ORIGINS:-}
+      # USB-HSM (WebAuthn). Defaults derive from TDCP_USER_ISSUER.
+      - TDCP_WEBAUTHN_RP_ID=${TDCP_WEBAUTHN_RP_ID:-}
+      - TDCP_WEBAUTHN_ORIGINS=${TDCP_WEBAUTHN_ORIGINS:-}
+      - TDCP_REQUIRE_VERIFIED_EMAIL=${TDCP_REQUIRE_VERIFIED_EMAIL:-false}
     volumes:
       - authority-data:/data/authority
     healthcheck:

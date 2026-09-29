@@ -14,7 +14,7 @@ export class EgressLink {
 
   private _state: LinkState;
   private _attemptedBytes = 0;
-  private _delivered: Buffer[] = [];
+  private _deliveredBytes = 0;
   private _droppedBytes = 0;
   private _escapedBytes = 0;
   private _firstBlockChunk: number | null = null;
@@ -43,11 +43,7 @@ export class EgressLink {
   }
 
   get deliveredBytes(): number {
-    return this._delivered.reduce((n, b) => n + b.length, 0);
-  }
-
-  get delivered(): Buffer {
-    return Buffer.concat(this._delivered);
+    return this._deliveredBytes;
   }
 
   get droppedBytes(): number {
@@ -100,7 +96,8 @@ export class EgressLink {
       return { accepted: false, droppedBytes: buf.length };
     }
 
-    this._delivered.push(buf);
+    // Deliberately do not retain plaintext/data-plane frames in memory.
+    this._deliveredBytes += buf.length;
     this._escapedBytes += buf.length;
     return { accepted: true, droppedBytes: 0 };
   }

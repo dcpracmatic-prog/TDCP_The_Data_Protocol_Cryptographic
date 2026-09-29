@@ -9,6 +9,7 @@ import { AuthorizationOracle, globalAuthorizationOracle } from '../oracle/author
 import { HttpAuthorityClient } from './http-authority-client.ts';
 import { InProcessAuthority } from './in-process-authority.ts';
 import type { AuthorizationAuthority } from './types.ts';
+import { getUserToken, hasUserTokenSource } from './user-token.ts';
 
 export function readAuthorityUrlFromEnv(
   env: Record<string, string | undefined> = typeof process !== 'undefined'
@@ -30,13 +31,18 @@ function readAdminTokenFromEnv(
     ? (process.env as Record<string, string | undefined>)
     : {}
 ): string | undefined {
-  // Prefer server/issuer env. VITE_ variant is LOCAL DEMO ONLY (leaks to browser bundle).
+  // Server/issuer tooling: TDCP_AUTHORITY_ADMIN_TOKEN.
+  // Browser: with accounts on (VITE_AUTH_ENABLED != "false") the admin token is
+  // NEVER read — users register/revoke their own documents with their session.
+  // The VITE_ fallback survives only for the anonymous local demo.
+  const viteEnv =
+    typeof import.meta !== 'undefined'
+      ? (import.meta as ImportMeta & { env?: Record<string, string> }).env
+      : undefined;
+  const accountsOn = viteEnv ? viteEnv.VITE_AUTH_ENABLED !== 'false' : false;
   const t =
     env.TDCP_AUTHORITY_ADMIN_TOKEN ||
-    (typeof import.meta !== 'undefined'
-      ? (import.meta as ImportMeta & { env?: Record<string, string> }).env
-          ?.VITE_TDCP_AUTHORITY_ADMIN_TOKEN
-      : undefined);
+    (!accountsOn ? viteEnv?.VITE_TDCP_AUTHORITY_ADMIN_TOKEN : undefined);
   if (!t || !String(t).trim()) return undefined;
   return String(t).trim();
 }
@@ -53,6 +59,9 @@ export function resolveAuthorizationAuthority(options?: {
       baseUrl: url,
       fetchImpl: options?.fetchImpl,
       adminToken: options?.adminToken ?? readAdminTokenFromEnv(),
+      // Signed-in user's identity (installed by authContext). No-op when absent.
+      getUserToken,
+      isUserBound: hasUserTokenSource,
     });
   }
   return new InProcessAuthority(options?.oracle ?? globalAuthorizationOracle);

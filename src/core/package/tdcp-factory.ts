@@ -9,6 +9,7 @@ import type { AuthorizationOracle } from '../../oracle/authorization-oracle.ts';
 import type { AuthorizationAuthority } from '../../authority/types.ts';
 import { InProcessAuthority } from '../../authority/in-process-authority.ts';
 import type { PolicyLevel } from '../authorization/types.ts';
+import type { EdgeSpec } from '../../channel/policy-binding.ts';
 import {
   generateRandomBytes,
   generateRandomId,
@@ -41,6 +42,16 @@ export interface CreateTDCPPackageInput {
   viewOnce?: boolean;
   watermarkRequired?: boolean;
   blurMode?: boolean;
+  /**
+   * Verified user ids (resolved by the issuer backend) allowed to open the
+   * document besides its owner. Only enforced by a remote Authority with
+   * TDCP_USER_AUTH=required; the owner is always the signed-in caller.
+   */
+  allowedUserIds?: string[];
+  /** Opening requires a verified USB-HSM (implicit for CRITICAL/ULTRA_CRITICAL). */
+  requireUsbHsm?: boolean;
+  /** Optional explicit data-plane edges; otherwise A→B is bound to plaintext size. */
+  channelEdges?: EdgeSpec[];
   /** Preferred: Authorization Authority (in-process or remote). */
   authority?: AuthorizationAuthority;
   /** @deprecated Prefer `authority`. Kept for existing callers/tests. */
@@ -60,6 +71,10 @@ export async function createTDCPPackage(input: CreateTDCPPackageInput): Promise<
   const salt = generateRandomBytes(32);
   const iv = generateRandomBytes(12);
   const createdAt = Date.now();
+  const plaintextBytes = new Uint8Array(input.plaintext);
+  const defaultChannelEdges: EdgeSpec[] = [
+    { source: 'A', destination: 'B', expectedBytes: plaintextBytes.byteLength, allowed: true },
+  ];
 
   const authority =
     input.authority ??
@@ -76,6 +91,11 @@ export async function createTDCPPackage(input: CreateTDCPPackageInput): Promise<
     expirationDays: input.expirationDays,
     viewOnce: input.viewOnce,
     createdAt,
+    ...(input.requireUsbHsm ? { requireUsbHsm: true } : {}),
+    channelEdges: input.channelEdges ?? defaultChannelEdges,
+    ...(input.allowedUserIds && input.allowedUserIds.length > 0
+      ? { allowedUserIds: input.allowedUserIds }
+      : {}),
   });
 
   const cek = await generateContentEncryptionKey();
@@ -88,8 +108,6 @@ export async function createTDCPPackage(input: CreateTDCPPackageInput): Promise<
     viewOnce: input.viewOnce,
     kdfIterations: TDCP_DEFAULT_PBKDF2_ITERATIONS,
   });
-  const plaintextBytes = new Uint8Array(input.plaintext);
-
   let ciphertextBase64 = '';
   let ultraCritical: TDCPPackage['ultraCritical'];
 

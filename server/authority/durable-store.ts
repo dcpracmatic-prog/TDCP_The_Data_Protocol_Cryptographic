@@ -9,6 +9,7 @@
  * platform keys when available; encrypted file is a local hardening step.
  */
 
+import type { UsbHsmDeviceRecord } from './usb-hsm.ts';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DocumentRevocationState } from '../../src/core/authorization/types.ts';
@@ -40,6 +41,9 @@ export interface DurableAuthoritySnapshot {
   consumedOperations: ConsumedOperationRecord[];
   consumedGrantIds: string[];
   activeChallenges: Array<{ challenge: string; registeredAt: number }>;
+  challengeSubjects: Array<{ challenge: string; subjectUserId: string }>;
+  /** Enrolled USB-HSM public keys + lifecycle (never private keys). */
+  usbHsmDevices: UsbHsmDeviceRecord[];
 }
 
 const EMPTY: DurableAuthoritySnapshot = {
@@ -54,6 +58,8 @@ const EMPTY: DurableAuthoritySnapshot = {
   consumedOperations: [],
   consumedGrantIds: [],
   activeChallenges: [],
+  challengeSubjects: [],
+  usbHsmDevices: [],
 };
 
 /** Caps to avoid unbounded JSON growth on disk (I/O overflow). */
@@ -97,6 +103,8 @@ export class DurableJsonAuthorityStore {
         consumedOperations: (parsed.consumedOperations ?? []).slice(-MAX_PERSIST_CONSUMED),
         consumedGrantIds: (parsed.consumedGrantIds ?? []).slice(-MAX_PERSIST_GRANTS),
         activeChallenges: (parsed.activeChallenges ?? []).slice(-MAX_PERSIST_CHALLENGES),
+        challengeSubjects: (parsed.challengeSubjects ?? []).slice(-MAX_PERSIST_CHALLENGES),
+        usbHsmDevices: parsed.usbHsmDevices ?? [],
       };
     } catch {
       return structuredClone(EMPTY);
@@ -109,6 +117,7 @@ export class DurableJsonAuthorityStore {
       consumedOperations: snapshot.consumedOperations.slice(-MAX_PERSIST_CONSUMED),
       consumedGrantIds: snapshot.consumedGrantIds.slice(-MAX_PERSIST_GRANTS),
       activeChallenges: snapshot.activeChallenges.slice(-MAX_PERSIST_CHALLENGES),
+      challengeSubjects: snapshot.challengeSubjects.slice(-MAX_PERSIST_CHALLENGES),
     };
     atomicWriteJson(this.snapshotPath, capped);
   }
