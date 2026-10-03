@@ -68,10 +68,6 @@ export interface CreateTDCPPackageInput {
  * authorization, wrap secrets, or grants.
  */
 export async function createTDCPPackage(input: CreateTDCPPackageInput): Promise<TDCPPackage> {
-  const documentId = generateRandomId('DOC');
-  const packageId = generateRandomId('PKG');
-  const salt = generateRandomBytes(32);
-  const iv = generateRandomBytes(12);
   const createdAt = input.policyCreatedAt ?? Date.now();
   const plaintextBytes = new Uint8Array(input.plaintext);
   const defaultChannelEdges: EdgeSpec[] = [
@@ -85,20 +81,40 @@ export async function createTDCPPackage(input: CreateTDCPPackageInput): Promise<
     throw new Error('AUTHORITY_REQUIRED: createTDCPPackage requires authority or oracle');
   }
 
-  const oracleWrapSecret = await authority.registerDocumentPolicy({
-    documentId,
-    packageId,
-    policyLevel: input.policyLevel,
-    allowExtraction: input.allowExtraction,
-    expirationDays: input.expirationDays,
-    viewOnce: input.viewOnce,
-    createdAt,
-    ...(input.requireUsbHsm ? { requireUsbHsm: true } : {}),
-    channelEdges: input.channelEdges ?? defaultChannelEdges,
-    ...(input.allowedUserIds && input.allowedUserIds.length > 0
-      ? { allowedUserIds: input.allowedUserIds }
-      : {}),
-  });
+  // Reserve the identity before producing ciphertext. A random-ID collision
+  // must not make a legitimate issuance fail; retry only the reservation.
+  let documentId = '';
+  let packageId = '';
+  let oracleWrapSecret: Uint8Array | undefined;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    documentId = generateRandomId('DOC');
+    packageId = generateRandomId('PKG');
+    try {
+      oracleWrapSecret = await authority.registerDocumentPolicy({
+        documentId,
+        packageId,
+        policyLevel: input.policyLevel,
+        allowExtraction: input.allowExtraction,
+        expirationDays: input.expirationDays,
+        viewOnce: input.viewOnce,
+        createdAt,
+        ...(input.requireUsbHsm ? { requireUsbHsm: true } : {}),
+        channelEdges: input.channelEdges ?? defaultChannelEdges,
+        ...(input.allowedUserIds && input.allowedUserIds.length > 0
+          ? { allowedUserIds: input.allowedUserIds }
+          : {}),
+      });
+      break;
+    } catch (err) {
+      if (!(err instanceof Error) || err.message !== 'DOCUMENT_ALREADY_REGISTERED' || attempt === 3) {
+        throw err;
+      }
+    }
+  }
+  if (!oracleWrapSecret) throw new Error('AUTHORITY_REGISTRATION_FAILED');
+
+  const salt = generateRandomBytes(32);
+  const iv = generateRandomBytes(12);
 
   const cek = await generateContentEncryptionKey();
   const rawCek = new Uint8Array(await crypto.subtle.exportKey('raw', cek));
