@@ -289,6 +289,7 @@ export class AuthorizationOracle {
     grant?: AuthorizationGrant;
     rejectionReason?: string;
     rejectionCode?: string;
+    channelPolicyBinding?: PolicyBinding;
   }> {
     await this.initialize();
 
