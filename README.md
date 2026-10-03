@@ -1,9 +1,10 @@
 [![CI](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/ci.yml/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/ci.yml)
 [![Bearer](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/bearer.yml/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/bearer.yml)
 [![CodeQL Advanced](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/codeql.yml/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/codeql.yml)
+[![Codacy Security Scan](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/codacy.yml/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/codacy.yml)
+[![GitHub Advanced Security](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/agents/github-advanced-security/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/agents/github-advanced-security)
 
 # **TDCP** 
-Web — Reference Implementation 2.5
 
 TDCP (The Data Cryptographic Protocol) separates encrypted packages from authorization to operate on them.
 
