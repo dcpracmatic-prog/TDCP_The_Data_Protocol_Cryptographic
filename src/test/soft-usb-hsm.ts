@@ -23,7 +23,7 @@ function base64Url(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("base64url");
 }
 
-function utf8(text: string): Uint8Array {
+function asArrayBuffer(bytes: Uint8Array): ArrayBuffer {\n  const copy = new Uint8Array(bytes.byteLength);\n  copy.set(bytes);\n  return copy.buffer;\n}\n\nfunction utf8(text: string): Uint8Array {
   return new TextEncoder().encode(text);
 }
 
@@ -157,7 +157,7 @@ export class SoftUsbHsm {
 
   private async rpIdHash(): Promise<Uint8Array> {
     return new Uint8Array(
-      await crypto.subtle.digest("SHA-256", utf8(this.rpId)),
+      await crypto.subtle.digest("SHA-256", asArrayBuffer(utf8(this.rpId))),
     );
   }
 
@@ -259,7 +259,7 @@ export class SoftUsbHsm {
       this.origin,
     );
     const clientDataHash = new Uint8Array(
-      await crypto.subtle.digest("SHA-256", clientDataJSON),
+      await crypto.subtle.digest("SHA-256", asArrayBuffer(clientDataJSON)),
     );
     const authenticatorData = concat(
       await this.rpIdHash(),
@@ -270,7 +270,7 @@ export class SoftUsbHsm {
       await crypto.subtle.sign(
         { name: "Ed25519" },
         this.privateKey,
-        concat(authenticatorData, clientDataHash),
+        asArrayBuffer(concat(authenticatorData, clientDataHash)),
       ),
     );
 
