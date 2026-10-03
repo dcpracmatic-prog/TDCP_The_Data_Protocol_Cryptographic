@@ -39,6 +39,8 @@ export interface CreateTDCPPackageInput {
   policyLevel: PolicyLevel;
   allowExtraction: boolean;
   expirationDays?: number;
+  /** Override policy createdAt (tests: simulated age). */
+  policyCreatedAt?: number;
   viewOnce?: boolean;
   watermarkRequired?: boolean;
   blurMode?: boolean;
@@ -70,7 +72,7 @@ export async function createTDCPPackage(input: CreateTDCPPackageInput): Promise<
   const packageId = generateRandomId('PKG');
   const salt = generateRandomBytes(32);
   const iv = generateRandomBytes(12);
-  const createdAt = Date.now();
+  const createdAt = input.policyCreatedAt ?? Date.now();
   const plaintextBytes = new Uint8Array(input.plaintext);
   const defaultChannelEdges: EdgeSpec[] = [
     { source: 'A', destination: 'B', expectedBytes: plaintextBytes.byteLength, allowed: true },

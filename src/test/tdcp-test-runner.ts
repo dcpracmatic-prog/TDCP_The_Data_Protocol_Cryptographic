@@ -60,6 +60,7 @@ async function createPkg(params: {
   allowExtraction?: boolean;
   expirationDays?: number;
   viewOnce?: boolean;
+  policyCreatedAt?: number;
 }): Promise<TDCPPackage> {
   return createTDCPPackage({
     plaintext: new TextEncoder().encode(params.plaintextStr).buffer,
@@ -70,6 +71,7 @@ async function createPkg(params: {
     allowExtraction: params.allowExtraction ?? false,
     expirationDays: params.expirationDays,
     viewOnce: params.viewOnce,
+    policyCreatedAt: params.policyCreatedAt,
     oracle: params.oracle,
   });
 }
@@ -231,15 +233,8 @@ export async function runTDCPTestSuite(
         password: 'PasswordOriginal!',
         plaintextStr: 'Datos temporales',
         expirationDays: 1,
+        policyCreatedAt: Date.now() - 3 * 24 * 60 * 60 * 1000,
         oracle,
-      });
-      oracle.registerDocumentPolicy({
-        documentId: pkg.documentId,
-        packageId: pkg.packageId,
-        policyLevel: 'STANDARD',
-        allowExtraction: false,
-        expirationDays: 1,
-        createdAt: Date.now() - 3 * 24 * 60 * 60 * 1000,
       });
       const unlockRes = await unlock({ pkg, password: 'PasswordOriginal!', oracle });
       const passed =

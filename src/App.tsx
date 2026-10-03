@@ -291,6 +291,7 @@ function MainDCPApp() {
                 <div className="sm:hidden">
                   <AuthorityStatusChip />
                 </div>
+                {developerMode && (
                 <div className="glass-card border border-white/10 bg-black/40 p-4">
                   <div className="mb-2 flex items-center justify-between text-[10px] font-bold tracking-wider text-white/50 uppercase">
                     <span className="flex items-center gap-1.5 text-emerald-400">
@@ -328,6 +329,7 @@ function MainDCPApp() {
                     <span className="text-[10px] font-medium text-emerald-300/90">{providers.oracleKeyStore}</span>
                   </div>
                 </div>
+                )}
                 <button
                   type="button"
                   onClick={() => {
