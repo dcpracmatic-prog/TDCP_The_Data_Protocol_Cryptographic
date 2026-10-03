@@ -11,6 +11,8 @@
 import { globalAuthorizationOracle } from '../oracle/authorization-oracle.ts';
 import type { AuthorizationOracle } from '../oracle/authorization-oracle.ts';
 import type { AuthorizationAuthority } from '../authority/types.ts';
+import { HttpAuthorityClient } from '../authority/http-authority-client.ts';
+import { hasUserTokenSource } from '../authority/user-token.ts';
 import {
   resolveAuthorizationAuthority,
   readAuthorityUrlFromEnv,
@@ -26,6 +28,8 @@ import {
   type TDCPPackage,
 } from '../core/package/package-format.ts';
 import type { PolicyLevel, TDCPRequestedOperation } from '../core/authorization/types.ts';
+import { UsbHsmProver } from '../identity/usb-hsm-provider.ts';
+import type { EdgeSpec } from '../channel/policy-binding.ts';
 import { MockNFCProvider, RealNFCProvider, type NFCProvider } from '../identity/credential-provider.ts';
 import {
   MockDeviceIdentityProvider,
@@ -39,6 +43,8 @@ import {
 } from '../identity/biometric-provider.ts';
 import { MemoryStorageProvider, type StorageProvider } from '../storage/storage-provider.ts';
 
+export const TDCP_SESSION_EVENT = 'tdcp:session-changed';
+
 export interface CreatePackageRequest {
   plaintext: ArrayBuffer;
   password: string;
@@ -50,6 +56,9 @@ export interface CreatePackageRequest {
   viewOnce?: boolean;
   watermarkRequired?: boolean;
   blurMode?: boolean;
+  allowedUserIds?: string[];
+  requireUsbHsm?: boolean;
+  channelEdges?: EdgeSpec[];
 }
 
 export class TdcpRuntime {
@@ -60,15 +69,21 @@ export class TdcpRuntime {
   public readonly deviceProvider: DeviceIdentityProvider;
   public readonly biometricProvider: BiometricProvider;
   public readonly localStorageProvider: StorageProvider;
+  public readonly usbHsm: UsbHsmProver | null;
 
   constructor() {
     this.oracle = globalAuthorizationOracle;
     this.authority = resolveAuthorizationAuthority({ oracle: this.oracle });
+    this.usbHsm = this.authority instanceof HttpAuthorityClient ? new UsbHsmProver(this.authority) : null;
     this.auditSink = globalAuditSink;
     this.nfcProvider = new MockNFCProvider();
     this.deviceProvider = new MockDeviceIdentityProvider();
     this.biometricProvider = new MockBiometricProvider();
     this.localStorageProvider = new MemoryStorageProvider();
+  }
+
+  public isUserBound(): boolean {
+    return this.authority instanceof HttpAuthorityClient && hasUserTokenSource();
   }
 
   public getProviderStatus() {
