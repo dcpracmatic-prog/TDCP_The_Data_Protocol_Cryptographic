@@ -84,6 +84,32 @@ Preview defaults follow the App Builder scripts (see `scripts/preview.mjs`; prev
 
 Hosting `dist/` alone does not create a remote authorization boundary unless clients point at a live Authority.
 
+## Vercel production
+
+Vercel is supported for the web application, **not** for the durable Authority: the
+Authority needs durable replay/revocation state and a protected signing backend,
+so host it separately behind HTTPS. `vercel.json` applies transport, clickjacking,
+MIME-sniffing, referrer, feature-policy and cross-origin isolation headers to every
+response, and disables caching for `/api/*`.
+
+The Vercel build command is deliberately fail-closed. Configure these values for
+the **Production** environment before deploying:
+
+```bash
+VITE_AUTH_ENABLED=true
+DATABASE_URL=postgresql://...
+BETTER_AUTH_SECRET=<at-least-32-random-characters>
+BETTER_AUTH_URL=https://app.example.com
+VITE_TDCP_AUTHORITY_URL=https://authority.example.com
+```
+
+`VITE_TDCP_AUTHORITY_URL` is public by design and must name the HTTPS remote
+Authority used by browsers. Do not place an admin token, Authority key, database
+credential, or any other secret in a `VITE_*` variable. The project uses
+`npm run vercel-build`; it does not run database migrations during a serverless
+build. Run reviewed migrations separately with `npm run db:migrate` from a
+controlled CI/operations environment.
+
 ## Environment
 
 See `.env.example`. Never commit secrets (`BETTER_AUTH_SECRET`, real `DATABASE_URL` credentials, Authority signing JWKs under `data/authority/`).

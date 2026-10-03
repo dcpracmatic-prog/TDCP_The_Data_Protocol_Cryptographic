@@ -38,6 +38,12 @@ import {
   type BiometricProvider,
 } from '../identity/biometric-provider.ts';
 import { MemoryStorageProvider, type StorageProvider } from '../storage/storage-provider.ts';
+import { HttpAuthorityClient } from '../authority/http-authority-client.ts';
+import { hasUserTokenSource } from '../authority/user-token.ts';
+import { UsbHsmProver } from '../identity/usb-hsm-provider.ts';
+
+/** Refresh signal for UI that depends on the authenticated Authority session. */
+export const TDCP_SESSION_EVENT = 'tdcp-session-updated';
 
 export interface CreatePackageRequest {
   plaintext: ArrayBuffer;
@@ -69,6 +75,21 @@ export class TdcpRuntime {
     this.deviceProvider = new MockDeviceIdentityProvider();
     this.biometricProvider = new MockBiometricProvider();
     this.localStorageProvider = new MemoryStorageProvider();
+  }
+
+  /** USB-HSM actions exist only through an authenticated remote Authority. */
+  public get usbHsm(): UsbHsmProver | null {
+    return this.authority instanceof HttpAuthorityClient ? new UsbHsmProver(this.authority) : null;
+  }
+
+  /** Never treat the in-browser demo Oracle as an authenticated user boundary. */
+  public isUserBound(): boolean {
+    return this.authority.kind === 'HTTP_REMOTE' && hasUserTokenSource();
+  }
+
+  /** Call after the app's account token changes so dependent UI can refresh. */
+  public notifySessionChanged(): void {
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event(TDCP_SESSION_EVENT));
   }
 
   public getProviderStatus() {

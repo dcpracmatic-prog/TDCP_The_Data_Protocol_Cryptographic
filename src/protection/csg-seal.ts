@@ -72,6 +72,45 @@ export async function createCsgSeal(
 }
 
 /**
+ * Bind a Gatekeeper operation to a portable CSG seal.  The exact canonical
+ * payload is sealed, so a copied seal cannot be re-attached to another grant,
+ * document, device, operation, or policy edge set.
+ */
+export async function createCsgOperationSeal(operation: {
+  documentId: string;
+  packageId: string;
+  grantId: string;
+  grantHash: string;
+  policyHash: string;
+  deviceId: string;
+  operationId: string;
+  operation: string;
+  expiresAt: number;
+  edges: unknown;
+}): Promise<CsgSealDocument> {
+  const attributes: Record<string, string> = {
+    documentId: operation.documentId,
+    packageId: operation.packageId,
+    grantId: operation.grantId,
+    grantHash: operation.grantHash,
+    policyHash: operation.policyHash,
+    deviceId: operation.deviceId,
+    operationId: operation.operationId,
+    operation: operation.operation,
+    expiresAt: String(operation.expiresAt),
+    edges: JSON.stringify(operation.edges),
+  };
+  const canonical = JSON.stringify(
+    Object.fromEntries(Object.entries(attributes).sort(([a], [b]) => a.localeCompare(b)))
+  );
+  return createCsgSeal(new TextEncoder().encode(canonical), {
+    label: 'tdcp-gatekeeper-operation',
+    attributes,
+    evento_id: operation.grantId,
+  });
+}
+
+/**
  * Verify a seal against recovered content bytes.
  */
 export async function verifyCsgSeal(

@@ -23,6 +23,7 @@ import {
   TDCP_DEFAULT_PBKDF2_ITERATIONS,
   decryptAESGCM,
   base64ToArrayBuffer,
+  computeSHA256,
   generateRandomId,
   wipeBuffer,
 } from '../core/crypto/primitives.ts';

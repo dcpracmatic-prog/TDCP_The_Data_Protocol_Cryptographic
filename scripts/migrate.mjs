@@ -37,7 +37,7 @@ function sslOptions(url) {
     connectionString,
     ssl: caPath
       ? { ca: readFileSync(caPath, "utf8"), rejectUnauthorized: true }
-      : { rejectUnauthorized: false },
+      : { rejectUnauthorized: true },
   };
 }
 
