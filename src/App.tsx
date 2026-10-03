@@ -27,7 +27,7 @@ import { AuthProvider, useAuth } from './lib/authContext.tsx';
 import { tdcpRuntime } from './runtime/tdcp-runtime.ts';
 import SettingsPanel from './components/SettingsPanel.tsx';
 import SecurityDevicesPanel from './components/SecurityDevicesPanel.tsx';
-import { UiPrefsProvider } from './lib/ui-prefs.tsx';
+import { UiPrefsProvider, useUiPrefs } from './lib/ui-prefs.tsx';
 
 function DcpCrystalIcon({ className = 'w-10 h-10' }: { className?: string }) {
   return (
@@ -68,24 +68,36 @@ type Tab = 'Decrypt' | 'Encrypt' | 'Monitor' | 'Validate' | 'Devices';
 const NAV_ITEMS: Array<{
   name: Tab;
   label: string;
+  labelDev?: string;
   desc: string;
   icon: typeof Unlock;
+  pilot?: boolean;
 }> = [
-  { name: 'Decrypt', label: 'Gatekeeper', desc: 'Único camino de apertura', icon: Unlock },
-  { name: 'Encrypt', label: 'Crear paquete', desc: 'TDCPPackage + Oracle', icon: Lock },
-  { name: 'Monitor', label: 'Auditoría', desc: 'Tamper-evident local', icon: Activity },
-  { name: 'Validate', label: 'Validación', desc: 'Pruebas reales', icon: FlaskConical },
+  { name: 'Decrypt', label: 'Abrir', labelDev: 'Gatekeeper', desc: 'Abrir paquete protegido', icon: Unlock, pilot: true },
+  { name: 'Encrypt', label: 'Proteger', labelDev: 'Crear paquete', desc: 'Crear paquete TDCP', icon: Lock, pilot: true },
+  { name: 'Monitor', label: 'Historial', labelDev: 'Auditoría', desc: 'Actividad reciente', icon: Activity, pilot: true },
+  { name: 'Validate', label: 'Validación', labelDev: 'Validación', desc: 'Pruebas del protocolo', icon: FlaskConical, pilot: false },
   {
     name: 'Devices',
-    label: 'Hardware & Identidad',
-    desc: 'Gestión de Raíz de Confianza Física (USB Binding), Smart Token y CSG',
+    label: 'Dispositivos',
+    labelDev: 'Hardware & Identidad',
+    desc: 'Identidad y hardware',
     icon: Usb,
+    pilot: false,
   },
 ];
 
 function MainDCPApp() {
   const { currentUser, isLoading, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('Decrypt');
+  const { developerMode } = useUiPrefs();
+  useEffect(() => {
+    if (!developerMode && (activeTab === 'Validate' || activeTab === 'Devices')) {
+      setActiveTab('Decrypt');
+    }
+  }, [developerMode, activeTab]);
+
+  const visibleNav = NAV_ITEMS.filter((i) => developerMode || i.pilot !== false);
   const [copiedId, setCopiedId] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -141,7 +153,7 @@ function MainDCPApp() {
     setMenuOpen(false);
   };
 
-  const activeLabel = NAV_ITEMS.find((i) => i.name === activeTab)?.label ?? activeTab;
+  const activeLabel = (function(){ const it = NAV_ITEMS.find((i) => i.name === activeTab); return (developerMode && it?.labelDev) ? it.labelDev : (it?.label ?? activeTab); })() ?? activeTab;
 
   return (
     <>
@@ -247,7 +259,7 @@ function MainDCPApp() {
                 </div>
 
                 <nav className="space-y-2">
-                  {NAV_ITEMS.map((item) => {
+                  {visibleNav.map((item) => {
                     const isActive = activeTab === item.name;
                     return (
                       <button
@@ -266,7 +278,7 @@ function MainDCPApp() {
                           <item.icon className="h-4 w-4" />
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-xs font-bold tracking-wide uppercase">{item.label}</span>
+                          <span className="text-xs font-bold tracking-wide uppercase">{developerMode && item.labelDev ? item.labelDev : item.label}</span>
                           <span className="text-[10px] font-normal text-white/40 normal-case">{item.desc}</span>
                         </div>
                       </button>

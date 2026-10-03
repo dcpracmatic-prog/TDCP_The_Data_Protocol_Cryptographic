@@ -3,6 +3,7 @@ import { Activity, Wifi, WifiOff } from 'lucide-react';
 import { readAuthorityUrlFromEnv } from '../authority/resolve-authority.ts';
 import { tdcpRuntime } from '../runtime/tdcp-runtime.ts';
 import { probeSmartTokenHealth } from '../protection/smart-token-local.ts';
+import { useUiPrefs } from '../lib/ui-prefs.tsx';
 
 type HealthState = 'checking' | 'connected' | 'offline' | 'in-process';
 
@@ -35,7 +36,7 @@ export function useAuthorityHealth(pollMs = 5000): AuthorityHealthSnapshot {
 
     const tick = async () => {
       try {
-        const res = await fetch(`${configuredUrl}/health`, { cache: 'no-store' });
+        const res = await fetch(`${configuredUrl}/healthz`, { cache: 'no-store' });
         const body = (await res.json().catch(() => null)) as {
           ok?: boolean;
           adminAuthMode?: string;
@@ -176,36 +177,41 @@ export function SmartTokenStatusChip({ className = '' }: { className?: string })
   );
 }
 
-/** Always-visible Authority status banner + connection chips. */
+/** Status bar: minimal by default; technical chips only in developer mode. */
 export function AuthorityStatusBar() {
   const health = useAuthorityHealth();
   const providers = tdcpRuntime.getProviderStatus();
   const remoteUrl = health.url || providers.authorityUrl;
+  const { developerMode } = useUiPrefs();
 
+  // Pilot UX: one short status line, no jargon unless developer mode
   let bannerText: string;
-  if (health.state === 'connected' && remoteUrl) {
-    bannerText = `Pre-prod — Authority en ${remoteUrl} (file signing — not HSM)`;
-  } else if (health.state === 'offline' && remoteUrl) {
-    bannerText = `Pre-prod — Authority OFFLINE (${remoteUrl}); Oracle in-process si Authority caído para paneles locales`;
-  } else if (health.state === 'checking' && remoteUrl) {
-    bannerText = `Pre-prod — comprobando Authority en ${remoteUrl}…`;
+  if (health.state === 'connected') {
+    bannerText = developerMode && remoteUrl
+      ? `Conectado · ${remoteUrl}`
+      : 'Sistema listo';
+  } else if (health.state === 'offline') {
+    bannerText = 'Sin conexión con el servidor de autorización';
+  } else if (health.state === 'checking') {
+    bannerText = 'Conectando…';
   } else {
-    bannerText =
-      'Pre-prod — Oracle in-process (sin TDCP_AUTHORITY_URL).';
+    bannerText = developerMode ? 'Modo local (sin Authority remoto)' : 'Sistema listo';
   }
 
   return (
-    <div className="mb-2 flex shrink-0 items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/50 px-2.5 py-1.5">
+    <div className="mb-2 flex shrink-0 items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/40 px-2.5 py-1.5">
       <p
-        className="min-w-0 truncate text-[10px] font-semibold leading-tight text-white/80"
-        title="Copiar el archivo no copia el derecho a usarlo · Copying the file does not copy the right to use it."
+        className="min-w-0 truncate text-[11px] font-medium leading-tight text-white/75"
+        title="Copiar el archivo no copia el derecho a usarlo"
       >
         {bannerText}
       </p>
-      <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
-        <SmartTokenStatusChip />
-        <AuthorityStatusChip />
-      </div>
+      {developerMode && (
+        <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
+          <SmartTokenStatusChip />
+          <AuthorityStatusChip />
+        </div>
+      )}
     </div>
   );
 }

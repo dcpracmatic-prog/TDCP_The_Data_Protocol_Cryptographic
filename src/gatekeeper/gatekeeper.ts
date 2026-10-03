@@ -25,6 +25,7 @@ import {
   base64ToArrayBuffer,
   generateRandomId,
   wipeBuffer,
+  computeSHA256,
 } from '../core/crypto/primitives.ts';
 import { AuthorizationOracle, globalAuthorizationOracle } from '../oracle/authorization-oracle.ts';
 import type { AuthorizationAuthority } from '../authority/types.ts';

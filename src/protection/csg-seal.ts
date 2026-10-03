@@ -137,3 +137,63 @@ export function sealSummary(seal: CsgSealDocument): string[] {
     seal.note,
   ];
 }
+
+/**
+ * CSG attestation for an authorized operation. Seals authorization context
+ * (grant + PolicyBinding + device + operation), not plaintext content.
+ */
+export async function createCsgOperationSeal(input: {
+  documentId: string;
+  packageId: string;
+  grantId: string;
+  grantHash: string;
+  policyHash: string;
+  deviceId: string;
+  operationId: string;
+  operation: string;
+  expiresAt: number;
+  edges: Array<{ source: string; destination: string; expectedBytes: number; allowed: boolean }>;
+}): Promise<CsgSealDocument> {
+  const canonical = JSON.stringify({
+    schema: 'TDCP_CSG_OPERATION_ATTEST_v1',
+    documentId: input.documentId,
+    packageId: input.packageId,
+    grantId: input.grantId,
+    grantHash: input.grantHash,
+    policyHash: input.policyHash,
+    deviceId: input.deviceId,
+    operationId: input.operationId,
+    operation: input.operation,
+    expiresAt: input.expiresAt,
+    edges: [...input.edges].sort((a, b) =>
+      `${a.source}->${a.destination}`.localeCompare(`${b.source}->${b.destination}`),
+    ),
+  });
+  const client = csgClientFromEnv();
+  if (client) {
+    return client.seal(new TextEncoder().encode(canonical), {
+      label: 'tdcp-operation-attestation',
+      attributes: {
+        grantId: input.grantId,
+        policyHash: input.policyHash,
+        operationId: input.operationId,
+      },
+      proyecto_id: 'tdcp',
+      evento_id: `TDCP-OP-${input.operationId}`,
+    });
+  }
+  if (
+    (typeof process !== 'undefined' ? process.env?.TDCP_CSG_ATTEST_REQUIRED : undefined) ===
+    'true'
+  ) {
+    throw new Error('CSG_REMOTE_REQUIRED_FOR_OPERATION_ATTESTATION');
+  }
+  return createLocalCsgSeal(new TextEncoder().encode(canonical), {
+    label: 'tdcp-operation-attestation',
+    attributes: {
+      grantId: input.grantId,
+      policyHash: input.policyHash,
+      operationId: input.operationId,
+    },
+  });
+}
