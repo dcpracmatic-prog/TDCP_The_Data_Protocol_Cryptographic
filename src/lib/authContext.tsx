@@ -59,6 +59,7 @@ interface AuthContextType {
   editSharedFolder: (folderId: string, updates: { name?: string; linkOrId?: string; description?: string; isDefault?: boolean }) => { success: boolean; error?: string };
   deleteSharedFolder: (folderId: string) => { success: boolean; error?: string };
   setDefaultFolder: (folderId: string) => void;
+  getSecurityQuestion: (email: string) => string | null;
   recoverPassword: (data: {
     email: string;
     securityAnswer: string;
@@ -432,6 +433,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCurrentUser({ ...user });
   };
 
+  const getSecurityQuestion = (email: string): string | null => {
+    const user = getUsersDB()[email.trim().toLowerCase()];
+    return user?.securityQuestion || null;
+  };
+
   const recoverPassword = async (data: {
     email: string;
     securityAnswer: string;
@@ -490,6 +496,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         editSharedFolder,
         deleteSharedFolder,
         setDefaultFolder,
+        getSecurityQuestion,
         recoverPassword,
         logout,
         enterDemoSession,
