@@ -49,13 +49,8 @@ function DcpCrystalIcon({ className = "w-14 h-14", svgStyle }: { className?: str
 }
 
 export default function AuthScreen() {
-  const { login, register, requestPasswordReset, resetPassword, generateCustomUserId } = useAuth();
-  // Password-reset links land on /?reset=1&token=... (Better Auth redirect).
-  const [resetToken] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    return new URLSearchParams(window.location.search).get('token');
-  });
-  const [mode, setMode] = useState<'login' | 'register' | 'recover'>(() => (resetToken ? 'recover' : 'login'));
+  const { login, register, getSecurityQuestion, recoverPassword, generateCustomUserId } = useAuth();
+  const [mode, setMode] = useState<'login' | 'register' | 'recover'>('login');
 
   // Form States
   const [email, setEmail] = useState('');
@@ -64,6 +59,8 @@ export default function AuthScreen() {
   const [name, setName] = useState('');
   const [customId, setCustomId] = useState('');
   const [driveFolderLink, setDriveFolderLink] = useState('');
+  const [securityQuestion, setSecurityQuestion] = useState('');
+  const [securityAnswer, setSecurityAnswer] = useState('');
   const [newPassword, setNewPassword] = useState('');
 
   // UI state
@@ -111,6 +108,11 @@ export default function AuthScreen() {
       return;
     }
 
+    if (!securityQuestion.trim() || !securityAnswer.trim()) {
+      setErrorMsg('Define una pregunta y una respuesta de recuperación para proteger la cuenta.');
+      return;
+    }
+
     if (!driveFolderLink.trim()) {
       setErrorMsg('Por favor ingresa el enlace de la carpeta de Google Drive donde se guardará tu información.');
       return;
@@ -129,6 +131,8 @@ export default function AuthScreen() {
         email,
         customId,
         password,
+        securityQuestion,
+        securityAnswer,
         driveFolderLink
       });
 
@@ -148,27 +152,30 @@ export default function AuthScreen() {
     setSuccessMsg(null);
     setIsSubmitting(true);
     try {
-      if (!resetToken) {
-        const res = await requestPasswordReset(email);
-        if (res.success) {
-          setSuccessMsg('Si el correo está registrado, recibirás un enlace para restablecer tu contraseña (válido 30 minutos).');
-        } else {
-          setErrorMsg(res.error || 'No se pudo enviar el enlace.');
-        }
+      const question = getSecurityQuestion(email);
+      if (!question) {
+        setErrorMsg('No se encontró una cuenta local con ese correo.');
         return;
       }
-
+      if (!securityAnswer.trim()) {
+        setErrorMsg('Introduce la respuesta de recuperación.');
+        return;
+      }
       if (newPassword !== confirmPassword) {
         setErrorMsg('Las nuevas contraseñas no coinciden.');
         return;
       }
-      const res = await resetPassword(resetToken, newPassword);
+      const res = await recoverPassword({
+        email,
+        securityAnswer,
+        newPassword,
+      });
       if (res.success) {
-        setSuccessMsg('¡Contraseña actualizada! Ya puedes iniciar sesión con tu nueva clave.');
-        window.history.replaceState(null, '', window.location.pathname);
-        setTimeout(() => {
-          window.location.reload();
-        }, 2200);
+        setSuccessMsg('Contraseña actualizada. Ya puedes iniciar sesión con la nueva clave.');
+        setSecurityAnswer('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setMode('login');
       } else {
         setErrorMsg(res.error || 'No se pudo restablecer la contraseña.');
       }
@@ -388,6 +395,31 @@ export default function AuthScreen() {
               </span>
             </div>
 
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[11px] uppercase font-bold text-white/60 mb-1">Pregunta de recuperación</label>
+                <input
+                  type="text"
+                  required
+                  value={securityQuestion}
+                  onChange={e => setSecurityQuestion(e.target.value)}
+                  placeholder="Una pregunta que recuerdes"
+                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 focus:border-pink-500/50 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] uppercase font-bold text-white/60 mb-1">Respuesta</label>
+                <input
+                  type="password"
+                  required
+                  value={securityAnswer}
+                  onChange={e => setSecurityAnswer(e.target.value)}
+                  placeholder="Respuesta de recuperación"
+                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 focus:border-pink-500/50 outline-none"
+                />
+              </div>
+            </div>
+
             {/* ENLACE DE CARPETA DE GOOGLE DRIVE */}
             <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/40 space-y-1.5 shadow-[0_0_15px_rgba(99,102,241,0.15)]">
               <div className="flex items-center justify-between">
@@ -463,7 +495,6 @@ export default function AuthScreen() {
         {/* 3. FORMULARIO DE RECUPERAR CONTRASEÑA */}
         {mode === 'recover' && (
           <form onSubmit={handleRecoverSubmit} className="space-y-3.5">
-            {!resetToken && (
             <div>
               <label className="block text-[11px] uppercase font-bold text-white/60 mb-1 flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5 text-indigo-400" /> Correo Registrado
@@ -477,9 +508,13 @@ export default function AuthScreen() {
                 className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 focus:border-indigo-500/50 outline-none"
               />
             </div>
-            )}
 
-            {resetToken && (
+            <div className="rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-2 text-[11px] text-indigo-200">
+              {getSecurityQuestion(email)
+                ? `Pregunta: ${getSecurityQuestion(email)}`
+                : 'Escribe el correo con el que registraste la cuenta para mostrar la pregunta de recuperación.'}
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-[11px] uppercase font-bold text-white/60 mb-1 flex items-center gap-1">
@@ -508,7 +543,6 @@ export default function AuthScreen() {
                 />
               </div>
             </div>
-            )}
 
             <button
               type="submit"
@@ -520,7 +554,7 @@ export default function AuthScreen() {
               ) : (
                 <>
                   <KeyRound className="w-4 h-4" />
-                  <span>{resetToken ? 'Guardar Nueva Contraseña' : 'Enviar Enlace de Restablecimiento'}</span>
+                  <span>Restablecer Contraseña</span>
                 </>
               )}
             </button>
