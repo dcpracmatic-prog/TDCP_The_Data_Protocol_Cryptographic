@@ -28,7 +28,7 @@
     "stop:mvp": "bash scripts/stop-mvp.sh",
     "smoke:mvp": "node scripts/smoke-mvp.mjs",
     "test:channel-guardian": "npm run build:channel-guardian && node --test packages/channel-guardian/test/guardian.test.mjs",
-    "build:channel-guardian": "npm run build --workspace packages/channel-guardian --if-present || (cd packages/channel-guardian && npm run build)"
+    "build:channel-guardian": "cd packages/channel-guardian && npm run build"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
