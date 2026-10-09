@@ -170,3 +170,38 @@ describe("Schema and lifecycle hardening", () => {
     assert.ok(g2.auditEvents().some((e) => e.reason === "binding_expired_at_send"));
   });
 });
+
+
+describe("Strict policyHash encoding", () => {
+  it("rejects valid digest bytes followed by malformed hex suffix", () => {
+    const { publicKey, privateKey } = generateAuthorityKeyPair();
+    const binding = signPolicyBinding(makePolicy(), privateKey, "kid-1");
+    const malformed = { ...binding, policyHash: binding.policyHash + "zz" };
+    assert.throws(
+      () => verifyPolicyBinding(malformed, publicKey),
+      /policy_binding_rejected: hash mismatch/,
+    );
+  });
+
+  it("rejects short and non-hex policyHash values", () => {
+    const { publicKey, privateKey } = generateAuthorityKeyPair();
+    const binding = signPolicyBinding(makePolicy(), privateKey, "kid-1");
+    for (const policyHashValue of [
+      binding.policyHash.slice(0, -2),
+      "g".repeat(64),
+      " ".repeat(64),
+    ]) {
+      assert.throws(
+        () => verifyPolicyBinding({ ...binding, policyHash: policyHashValue }, publicKey),
+        /policy_binding_rejected: hash mismatch/,
+      );
+    }
+  });
+
+  it("accepts the same valid SHA-256 digest in uppercase hex", () => {
+    const { publicKey, privateKey } = generateAuthorityKeyPair();
+    const binding = signPolicyBinding(makePolicy(), privateKey, "kid-1");
+    const uppercase = { ...binding, policyHash: binding.policyHash.toUpperCase() };
+    assert.equal(verifyPolicyBinding(uppercase, publicKey).documentId, "doc-test");
+  });
+});
