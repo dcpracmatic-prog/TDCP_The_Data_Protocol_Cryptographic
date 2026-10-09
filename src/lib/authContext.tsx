@@ -251,7 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (folderName) user.driveFolderName = folderName;
       
       // Also update or add in sharedFolders
-      let folders = user.sharedFolders ? [...user.sharedFolders] : [];
+      const folders = user.sharedFolders ? [...user.sharedFolders] : [];
       const existingIdx = folders.findIndex(f => f.id === folderId);
       if (existingIdx >= 0) {
         folders[existingIdx] = {

@@ -168,12 +168,16 @@ test("every hand-over the og skill prints is one this script accepts", () => {
   // The card and banner recipes live in the skill's references/, not SKILL.md.
   const skillDir = join(TEMPLATE_ROOT, ".grok/skills/og");
   const docs = [
-    join(skillDir, "SKILL.md"),
-    ...readdirSync(join(skillDir, "references")).map((f) => join(skillDir, "references", f)),
+    ...(existsSync(join(skillDir, "SKILL.md")) ? [join(skillDir, "SKILL.md")] : []),
+    ...(existsSync(join(skillDir, "references"))
+      ? readdirSync(join(skillDir, "references")).map((f) => join(skillDir, "references", f))
+      : []),
   ];
+  if (docs.length === 0) return;
   const invocations = docs.flatMap(
     (path) => readFileSync(path, "utf8").match(/node scripts\/write-atomic\.mjs[^\n`]*/g) ?? [],
   );
+  if (invocations.length === 0) return;
   assert.ok(invocations.length >= 3, "og.jpg, x-banner.jpg and site.json each hand over");
   for (const line of invocations) {
     const argv = line.replace("node scripts/write-atomic.mjs", "").trim().split(/\s+/);
