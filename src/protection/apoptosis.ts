@@ -87,7 +87,9 @@ export class ControlledRuntimeSession {
     for (const url of this.resources.objectUrls) {
       try {
         URL.revokeObjectURL(url);
-      } catch {}
+      } catch {
+        /* ignore object URL revocation errors */
+      }
     }
     this.resources.objectUrls = [];
 
@@ -98,7 +100,9 @@ export class ControlledRuntimeSession {
     if (this.resources.onApoptosis) {
       try {
         this.resources.onApoptosis();
-      } catch {}
+      } catch {
+        /* ignore user callback errors during apoptosis */
+      }
     }
   }
 
