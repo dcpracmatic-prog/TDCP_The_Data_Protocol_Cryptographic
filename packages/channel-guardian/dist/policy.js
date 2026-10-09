@@ -7,7 +7,16 @@
  * - Mutation of edges after binding is impossible because the Guardian
  *   never exposes a mutable edges map; it only holds the verified binding.
  */
-import { createHash, createVerify, createSign, generateKeyPairSync } from "node:crypto";
+import { createHash, createVerify, createSign, generateKeyPairSync, timingSafeEqual } from "node:crypto";
+function safeEqualHex(a, b) {
+    if (typeof a !== "string" || typeof b !== "string")
+        return false;
+    const bufA = Buffer.from(a, "hex");
+    const bufB = Buffer.from(b, "hex");
+    if (bufA.length !== bufB.length)
+        return false;
+    return timingSafeEqual(bufA, bufB);
+}
 /** Deterministic canonical serialization of a ChannelPolicy. */
 export function canonicalizePolicy(policy) {
     const edges = [...policy.edges]
@@ -77,7 +86,7 @@ export function verifyPolicyBinding(binding, authorityPublicKey) {
     const now = Date.now();
     // Recompute hash
     const expectedHash = policyHash(binding.policyCanonical);
-    if (expectedHash !== binding.policyHash) {
+    if (!safeEqualHex(expectedHash, binding.policyHash)) {
         throw new Error("policy_binding_rejected: hash mismatch");
     }
     // Verify signature (ECDSA P-256 / SHA-256 — matches TDCP grant curve)
