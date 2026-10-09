@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth, extractDriveFolderId } from '../lib/authContext.tsx';
+import { useAuth, SECURITY_QUESTIONS } from '../lib/authContext.tsx';
 import { 
   Lock, KeyRound, Mail, User, ShieldCheck, Sparkles, RefreshCw, 
   ArrowRight, ShieldAlert, CheckCircle2, Eye, EyeOff, Fingerprint, ChevronRight,
-  HardDrive, FolderOpen, Link as LinkIcon
+  
 } from 'lucide-react';
 
 // Glowing Hexagonal Crystal Emblem matching DCP icon
@@ -58,7 +58,6 @@ export default function AuthScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [customId, setCustomId] = useState('');
-  const [driveFolderLink, setDriveFolderLink] = useState('');
   const [securityQuestion, setSecurityQuestion] = useState('');
   const [securityAnswer, setSecurityAnswer] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -113,17 +112,6 @@ export default function AuthScreen() {
       return;
     }
 
-    if (!driveFolderLink.trim()) {
-      setErrorMsg('Por favor ingresa el enlace de la carpeta de Google Drive donde se guardará tu información.');
-      return;
-    }
-
-    const { folderId } = extractDriveFolderId(driveFolderLink);
-    if (!folderId) {
-      setErrorMsg('El enlace de la carpeta de Google Drive no es válido. Debe tener el formato https://drive.google.com/drive/folders/...');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       const res = await register({
@@ -132,8 +120,7 @@ export default function AuthScreen() {
         customId,
         password,
         securityQuestion,
-        securityAnswer,
-        driveFolderLink
+        securityAnswer
       });
 
       if (!res.success) {
@@ -398,14 +385,19 @@ export default function AuthScreen() {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-[11px] uppercase font-bold text-white/60 mb-1">Pregunta de recuperación</label>
-                <input
-                  type="text"
+                <select
                   required
                   value={securityQuestion}
                   onChange={e => setSecurityQuestion(e.target.value)}
-                  placeholder="Una pregunta que recuerdes"
-                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder:text-white/30 focus:border-pink-500/50 outline-none"
-                />
+                  className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs text-white focus:border-pink-500/50 outline-none"
+                >
+                  <option value="">Selecciona una pregunta</option>
+                  {SECURITY_QUESTIONS.map((question) => (
+                    <option key={question} value={question} className="bg-slate-900 text-white">
+                      {question}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-[11px] uppercase font-bold text-white/60 mb-1">Respuesta</label>
@@ -420,30 +412,8 @@ export default function AuthScreen() {
               </div>
             </div>
 
-            {/* ENLACE DE CARPETA DE GOOGLE DRIVE */}
-            <div className="p-3 rounded-xl bg-indigo-950/40 border border-indigo-500/40 space-y-1.5 shadow-[0_0_15px_rgba(99,102,241,0.15)]">
-              <div className="flex items-center justify-between">
-                <label className="text-[11px] uppercase font-bold text-indigo-300 flex items-center gap-1.5">
-                  <HardDrive className="w-3.5 h-3.5 text-indigo-400" /> Carpeta en Google Drive (Destino)
-                </label>
-                <span className="text-[9px] bg-indigo-500/20 text-indigo-300 px-1.5 py-0.5 rounded font-mono border border-indigo-500/40 uppercase font-bold">
-                  Requerido
-                </span>
-              </div>
-              <div className="relative">
-                <input
-                  type="url"
-                  required
-                  value={driveFolderLink}
-                  onChange={e => setDriveFolderLink(e.target.value)}
-                  placeholder="https://drive.google.com/drive/folders/1aBcDeFg..."
-                  className="w-full bg-black/60 border border-indigo-500/40 rounded-lg px-3 py-2 pr-8 text-xs text-indigo-100 placeholder:text-white/30 focus:border-indigo-400 outline-none"
-                />
-                <LinkIcon className="w-3.5 h-3.5 text-indigo-400/60 absolute right-2.5 top-2.5 pointer-events-none" />
-              </div>
-              <p className="text-[10px] text-white/60 leading-relaxed">
-                Pega el enlace de la carpeta de Google Drive donde se guardarán y sincronizarán tus paquetes cifrados.
-              </p>
+            <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-3 text-[11px] leading-relaxed text-cyan-100/80">
+              La cuenta se crea sin vincular Google Drive. Puedes conectar una carpeta después desde el módulo de almacenamiento, cuando lo necesites.
             </div>
 
             <div className="grid grid-cols-2 gap-2">
