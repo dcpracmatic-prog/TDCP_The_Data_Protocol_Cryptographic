@@ -6,21 +6,30 @@ on:
   pull_request:
     branches: [main, master]
 
+permissions:
+  contents: read
+
 jobs:
   build-test:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: npm
 
-      - name: Install
+      - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       - name: Test (protocol + auth/app-data + Authority)
         env:
@@ -30,13 +39,14 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
-        
-      - name: Build
-        run: npm run build
+
+      # package.json's "build" also runs db:migrate, which requires a configured
+      # database and should not be an implicit side effect of a frontend CI build.
+      - name: Build frontend bundle
         env:
           VITE_AUTH_ENABLED: "false"
+        run: node --env-file-if-exists=.env scripts/with-app-env.mjs vite build
 
-      # they are not required for the TDCP protocol gate. Run informatively.
       - name: Script harness tests (informational)
         continue-on-error: true
         run: npm run test:scripts
