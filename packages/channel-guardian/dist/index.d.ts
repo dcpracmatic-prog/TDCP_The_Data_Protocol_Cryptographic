@@ -17,6 +17,8 @@
  *
  * See docs/INTEGRATION.md for the recommended wiring with TDCP.
  */
+export type { AuditEvent, ChannelPolicy, EdgeSpec, LinkState, PolicyBinding, SendResult, } from "./types.js";
 export { EgressLink } from "./egress-link.js";
 export { canonicalizePolicy, edgeKey, generateAuthorityKeyPair, policyHash, signPolicyBinding, validateChannelPolicy, verifyPolicyBinding, } from "./policy.js";
 export { ChannelGuardian } from "./guardian.js";
+//# sourceMappingURL=index.d.ts.map
