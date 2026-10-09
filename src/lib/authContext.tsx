@@ -1,5 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
+export const SECURITY_QUESTIONS = [
+  '¿Cuál era el apodo que tenías de niño?',
+  '¿En qué ciudad conociste a tu mejor amigo?',
+  '¿Cómo se llamaba tu primer maestro?',
+  '¿Cuál fue el primer concierto al que asististe?',
+  '¿Cuál era el nombre de tu primera mascota?',
+] as const;
+
 export interface SharedDriveFolder {
   id: string; // Folder ID in Google Drive
   name: string; // Custom label
@@ -52,7 +60,6 @@ interface AuthContextType {
     password: string;
     securityQuestion: string;
     securityAnswer: string;
-    driveFolderLink: string;
   }) => Promise<{ success: boolean; error?: string }>;
   updateUserFolder: (folderLink: string, folderId: string, folderName?: string) => void;
   addSharedFolder: (folder: { name: string; linkOrId: string; description?: string; isDefault?: boolean }) => { success: boolean; error?: string; folder?: SharedDriveFolder };
@@ -166,7 +173,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const cleanEmail = data.email.trim().toLowerCase();
     const cleanName = data.name.trim();
     const customId = data.customId.trim().toUpperCase() || generateCustomUserId();
-    const driveFolderInput = data.driveFolderLink?.trim() || '';
 
     if (!cleanEmail || !cleanName || !data.password) {
       return { success: false, error: 'Todos los campos requeridos deben ser completados.' };
@@ -176,13 +182,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: false, error: 'Por favor, introduce un correo electrónico válido.' };
     }
 
-    if (!driveFolderInput) {
-      return { success: false, error: 'Por favor ingresa el enlace de tu carpeta de Google Drive donde se guardará tu información.' };
+    if (!SECURITY_QUESTIONS.includes(data.securityQuestion as (typeof SECURITY_QUESTIONS)[number])) {
+      return { success: false, error: 'Selecciona una pregunta de recuperación preestablecida.' };
     }
-
-    const { folderId, cleanUrl } = extractDriveFolderId(driveFolderInput);
-    if (!folderId) {
-      return { success: false, error: 'El enlace de la carpeta de Google Drive no es válido. Ingresa un enlace tipo https://drive.google.com/drive/folders/...' };
+    if (!data.securityAnswer.trim()) {
+      return { success: false, error: 'La respuesta de recuperación es obligatoria.' };
     }
 
     if (data.password.length < 6) {
@@ -205,17 +209,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const passwordHash = await hashSecret(data.password);
     const securityAnswerHash = await hashSecret(data.securityAnswer);
 
-    const initialSharedFolders: SharedDriveFolder[] = [
-      {
-        id: folderId,
-        name: 'Carpeta Principal',
-        link: cleanUrl,
-        description: 'Carpeta predeterminada asignada en el registro',
-        isDefault: true,
-        addedAt: Date.now()
-      }
-    ];
-
     const newUser: DCPUser = {
       id: customId,
       name: cleanName,
@@ -223,10 +216,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       passwordHash,
       securityQuestion: data.securityQuestion,
       securityAnswerHash,
-      driveFolderLink: cleanUrl,
-      driveFolderId: folderId,
-      driveFolderName: 'Carpeta Principal',
-      sharedFolders: initialSharedFolders,
+      sharedFolders: [],
       createdAt: Date.now(),
       lastLogin: Date.now()
     };
