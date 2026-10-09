@@ -11,9 +11,11 @@ import { createHash, createVerify, createSign, generateKeyPairSync, timingSafeEq
 function safeEqualHex(a, b) {
     if (typeof a !== "string" || typeof b !== "string")
         return false;
+    if (!/^[0-9a-fA-F]{64}$/.test(a) || !/^[0-9a-fA-F]{64}$/.test(b))
+        return false;
     const bufA = Buffer.from(a, "hex");
     const bufB = Buffer.from(b, "hex");
-    if (bufA.length !== bufB.length)
+    if (bufA.length !== 32 || bufB.length !== 32)
         return false;
     return timingSafeEqual(bufA, bufB);
 }
