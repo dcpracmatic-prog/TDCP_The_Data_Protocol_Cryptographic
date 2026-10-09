@@ -8,8 +8,24 @@
  *   never exposes a mutable edges map; it only holds the verified binding.
  */
 
-import { createHash, createVerify, createSign, generateKeyPairSync, KeyObject } from "node:crypto";
+import { createHash, createVerify, createSign, generateKeyPairSync, timingSafeEqual, KeyObject } from "node:crypto";
 import type { ChannelPolicy, EdgeSpec, PolicyBinding } from "./types.js";
+
+/**
+ * Compare SHA-256 hex digests without leaking byte-by-byte equality timing.
+ * Validate the complete representation before decoding: Buffer.from(hex)
+ * silently truncates malformed input, so decoding alone is not validation.
+ */
+function safeEqualHex(a: string, b: string): boolean {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  if (!/^[0-9a-fA-F]{64}$/.test(a) || !/^[0-9a-fA-F]{64}$/.test(b)) return false;
+
+  const bufA = Buffer.from(a, "hex");
+  const bufB = Buffer.from(b, "hex");
+  // SHA-256 must always decode to exactly 32 bytes.
+  if (bufA.length !== 32 || bufB.length !== 32) return false;
+  return timingSafeEqual(bufA, bufB);
+}
 
 /** Deterministic canonical serialization of a ChannelPolicy. */
 export function canonicalizePolicy(policy: ChannelPolicy): string {
@@ -87,9 +103,9 @@ export function verifyPolicyBinding(
 ): ChannelPolicy {
   const now = Date.now();
 
-  // Recompute hash
+  // Recompute hash and require canonical 32-byte SHA-256 hex encoding.
   const expectedHash = policyHash(binding.policyCanonical);
-  if (expectedHash !== binding.policyHash) {
+  if (!safeEqualHex(expectedHash, binding.policyHash)) {
     throw new Error("policy_binding_rejected: hash mismatch");
   }
 
