@@ -6,6 +6,8 @@
  * Does not perform WebUSB I/O itself — callers supply HardwareSnapshot.
  */
 
+import { bytesToHex } from '../core/crypto/primitives.ts';
+
 export interface HardwareSnapshot {
   vendorId: number;
   productId: number;
@@ -77,7 +79,7 @@ function stableHardwareJson(h: HardwareSnapshot): string {
 async function sha256Hex(data: string): Promise<string> {
   const bytes = new TextEncoder().encode(data);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return bytesToHex(new Uint8Array(digest));
 }
 
 export async function hardwareDigest(hardware: HardwareSnapshot): Promise<string> {

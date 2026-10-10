@@ -6,6 +6,8 @@
  * When a CSG_SEAL_URL sidecar exists, callers may swap to remote sealing.
  */
 
+import { bytesToHex } from '../core/crypto/primitives.ts';
+
 export interface CsgLocalSeal {
   schema: 'tdcp.csg-local.v1';
   sealId: string;
@@ -41,7 +43,7 @@ function fromB64(s: string): Uint8Array {
 async function sha256Hex(data: ArrayBuffer | Uint8Array): Promise<string> {
   const u8 = data instanceof Uint8Array ? data : new Uint8Array(data);
   const dig = await crypto.subtle.digest('SHA-256', u8.buffer as ArrayBuffer);
-  return [...new Uint8Array(dig)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  return bytesToHex(new Uint8Array(dig));
 }
 
 /** Canonical bytes signed: digest || label || createdAt || sorted attrs */

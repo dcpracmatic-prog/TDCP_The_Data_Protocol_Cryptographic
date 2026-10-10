@@ -26,7 +26,7 @@ const HEX_TABLE = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(
  * Performance impact: ~10x speedup over Array.from(bytes).map(b => b.toString(16)...).join('')
  * by avoiding intermediate array allocations and per-byte padStart/toString calls.
  */
-function bytesToHex(bytes: Uint8Array): string {
+export function bytesToHex(bytes: Uint8Array): string {
   let hex = '';
   for (let i = 0; i < bytes.length; i++) {
     hex += HEX_TABLE[bytes[i]];

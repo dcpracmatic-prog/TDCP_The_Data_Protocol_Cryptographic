@@ -6,6 +6,7 @@
  */
 
 import { AntiReplayRegistry, type ConsumedOperationRecord } from '../core/replay/replay-cache.ts';
+import { bytesToHex } from '../core/crypto/primitives.ts';
 import { UsbHsmSigningBackend } from './usb-binding.ts';
 import {
   loadSecurityDevicePrefs,
@@ -52,7 +53,7 @@ export async function exportSealedAntiReplay(
   }
 
   const digestBuf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(payload));
-  const digest = [...new Uint8Array(digestBuf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const digest = bytesToHex(new Uint8Array(digestBuf));
   return {
     exportedAt: Date.now(),
     operations,

@@ -11,6 +11,8 @@
  * It MUST NOT return verified: true merely because the method was invoked.
  */
 
+import { bytesToHex } from '../core/crypto/primitives.ts';
+
 export interface BiometricVerificationResult {
   verified: boolean;
   biometricType: 'FINGERPRINT' | 'FACIAL_RECOGNITION' | 'PIN_UNLOCKED' | 'SIMULATED';
@@ -108,9 +110,7 @@ export class WebAuthnBiometricProvider implements BiometricProvider {
         verified: true,
         biometricType: 'FINGERPRINT',
         timestamp: Date.now(),
-        attestationChallenge: Array.from(challenge)
-          .map((b) => b.toString(16).padStart(2, '0'))
-          .join(''),
+        attestationChallenge: bytesToHex(challenge),
         detail: prompt,
       };
     } catch (err: unknown) {
