@@ -60,7 +60,7 @@ interface AuthContextType {
     password: string;
     securityQuestion: string;
     securityAnswer: string;
-  }) => Promise<{ success: boolean; error?: string }>;
+    main 
   updateUserFolder: (folderLink: string, folderId: string, folderName?: string) => void;
   addSharedFolder: (folder: { name: string; linkOrId: string; description?: string; isDefault?: boolean }) => { success: boolean; error?: string; folder?: SharedDriveFolder };
   editSharedFolder: (folderId: string, updates: { name?: string; linkOrId?: string; description?: string; isDefault?: boolean }) => { success: boolean; error?: string };
@@ -168,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string;
     securityQuestion: string;
     securityAnswer: string;
-    driveFolderLink: string;
+    driveFolderLink?: string;
   }): Promise<{ success: boolean; error?: string }> => {
     const cleanEmail = data.email.trim().toLowerCase();
     const cleanName = data.name.trim();
@@ -181,6 +181,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!cleanEmail.includes('@') || !cleanEmail.includes('.')) {
       return { success: false, error: 'Por favor, introduce un correo electrónico válido.' };
     }
+
+   const { folderId, cleanUrl } = driveFolderInput ? extractDriveFolderId(driveFolderInput) : { folderId: '', cleanUrl: '' };
 
     if (!SECURITY_QUESTIONS.includes(data.securityQuestion as (typeof SECURITY_QUESTIONS)[number])) {
       return { success: false, error: 'Selecciona una pregunta de recuperación preestablecida.' };

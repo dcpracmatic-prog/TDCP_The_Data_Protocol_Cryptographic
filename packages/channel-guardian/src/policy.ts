@@ -11,6 +11,13 @@
 import { createHash, createVerify, createSign, generateKeyPairSync, timingSafeEqual, KeyObject } from "node:crypto";
 import type { ChannelPolicy, EdgeSpec, PolicyBinding } from "./types.js";
 
+ jules/audit-report-and-code-quality-fixes-6928040402572855229
+function safeEqualHex(a: string, b: string): boolean {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const bufA = Buffer.from(a, "hex");
+  const bufB = Buffer.from(b, "hex");
+  if (bufA.length !== bufB.length) return false;
+
 /**
  * Compare SHA-256 hex digests without leaking byte-by-byte equality timing.
  * Validate the complete representation before decoding: Buffer.from(hex)
@@ -23,7 +30,8 @@ function safeEqualHex(a: string, b: string): boolean {
   const bufA = Buffer.from(a, "hex");
   const bufB = Buffer.from(b, "hex");
   // SHA-256 must always decode to exactly 32 bytes.
-  if (bufA.length !== 32 || bufB.length !== 32) return false;
+  if (bufA.length !== 32 || bufB.length !== 32) return false
+  main
   return timingSafeEqual(bufA, bufB);
 }
 

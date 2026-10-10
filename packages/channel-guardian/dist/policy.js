@@ -10,12 +10,18 @@
 import { createHash, createVerify, createSign, generateKeyPairSync, timingSafeEqual } from "node:crypto";
 function safeEqualHex(a, b) {
     if (typeof a !== "string" || typeof b !== "string")
-        return false;
+        return false
+  jules/audit-report-and-code-quality-fixes-6928040402572855229
+    const bufA = Buffer.from(a, "hex");
+    const bufB = Buffer.from(b, "hex");
+    if (bufA.length !== bufB.length)
+
     if (!/^[0-9a-fA-F]{64}$/.test(a) || !/^[0-9a-fA-F]{64}$/.test(b))
         return false;
     const bufA = Buffer.from(a, "hex");
     const bufB = Buffer.from(b, "hex");
     if (bufA.length !== 32 || bufB.length !== 32)
+      main
         return false;
     return timingSafeEqual(bufA, bufB);
 }
