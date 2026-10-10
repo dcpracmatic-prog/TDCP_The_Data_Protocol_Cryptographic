@@ -52,7 +52,7 @@ interface AuthContextType {
     password: string;
     securityQuestion: string;
     securityAnswer: string;
-    driveFolderLink: string;
+    driveFolderLink?: string;
   }) => Promise<{ success: boolean; error?: string }>;
   updateUserFolder: (folderLink: string, folderId: string, folderName?: string) => void;
   addSharedFolder: (folder: { name: string; linkOrId: string; description?: string; isDefault?: boolean }) => { success: boolean; error?: string; folder?: SharedDriveFolder };
@@ -161,7 +161,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string;
     securityQuestion: string;
     securityAnswer: string;
-    driveFolderLink: string;
+    driveFolderLink?: string;
   }): Promise<{ success: boolean; error?: string }> => {
     const cleanEmail = data.email.trim().toLowerCase();
     const cleanName = data.name.trim();
@@ -176,14 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: false, error: 'Por favor, introduce un correo electrónico válido.' };
     }
 
-    if (!driveFolderInput) {
-      return { success: false, error: 'Por favor ingresa el enlace de tu carpeta de Google Drive donde se guardará tu información.' };
-    }
-
-    const { folderId, cleanUrl } = extractDriveFolderId(driveFolderInput);
-    if (!folderId) {
-      return { success: false, error: 'El enlace de la carpeta de Google Drive no es válido. Ingresa un enlace tipo https://drive.google.com/drive/folders/...' };
-    }
+    const { folderId, cleanUrl } = driveFolderInput ? extractDriveFolderId(driveFolderInput) : { folderId: '', cleanUrl: '' };
 
     if (data.password.length < 6) {
       return { success: false, error: 'La contraseña debe contener al menos 6 caracteres.' };
@@ -251,7 +244,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (folderName) user.driveFolderName = folderName;
       
       // Also update or add in sharedFolders
-      let folders = user.sharedFolders ? [...user.sharedFolders] : [];
+      const folders = user.sharedFolders ? [...user.sharedFolders] : [];
       const existingIdx = folders.findIndex(f => f.id === folderId);
       if (existingIdx >= 0) {
         folders[existingIdx] = {

@@ -8,8 +8,16 @@
  *   never exposes a mutable edges map; it only holds the verified binding.
  */
 
-import { createHash, createVerify, createSign, generateKeyPairSync, KeyObject } from "node:crypto";
+import { createHash, createVerify, createSign, generateKeyPairSync, timingSafeEqual, KeyObject } from "node:crypto";
 import type { ChannelPolicy, EdgeSpec, PolicyBinding } from "./types.js";
+
+function safeEqualHex(a: string, b: string): boolean {
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  const bufA = Buffer.from(a, "hex");
+  const bufB = Buffer.from(b, "hex");
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
 
 /** Deterministic canonical serialization of a ChannelPolicy. */
 export function canonicalizePolicy(policy: ChannelPolicy): string {
@@ -89,7 +97,7 @@ export function verifyPolicyBinding(
 
   // Recompute hash
   const expectedHash = policyHash(binding.policyCanonical);
-  if (expectedHash !== binding.policyHash) {
+  if (!safeEqualHex(expectedHash, binding.policyHash)) {
     throw new Error("policy_binding_rejected: hash mismatch");
   }
 
