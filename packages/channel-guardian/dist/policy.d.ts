@@ -12,14 +12,14 @@ import type { ChannelPolicy, EdgeSpec, PolicyBinding } from "./types.js";
 /** Deterministic canonical serialization of a ChannelPolicy. */
 export declare function canonicalizePolicy(policy: ChannelPolicy): string;
 export declare function policyHash(canonical: string): string;
+/** Validate ChannelPolicy shape and reject duplicate edges. */
+export declare function validateChannelPolicy(policy: ChannelPolicy): void;
 /**
  * Verify a PolicyBinding against an Authority public key.
  * Returns the parsed ChannelPolicy if valid; throws otherwise.
  *
  * This is the sole entry point for materializing links — closes D1/D1b/D2.
  */
-/** Validate ChannelPolicy shape and reject duplicate edges. */
-export declare function validateChannelPolicy(policy: ChannelPolicy): void;
 export declare function verifyPolicyBinding(binding: PolicyBinding, authorityPublicKey: KeyObject | string): ChannelPolicy;
 /**
  * Helper used by the TDCP Authority (or tests) to produce a PolicyBinding.
