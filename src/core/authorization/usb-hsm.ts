@@ -16,6 +16,7 @@
  */
 
 import type { TDCPRequestedOperation } from './types.ts';
+import { bytesToHex } from '../crypto/primitives.ts';
 
 export const USB_HSM_CHALLENGE_DOMAIN = 'TDCP-USB-HSM-AUTHZ-v1';
 export const USB_HSM_DEVICE_PREFIX = 'USBHSM-';
@@ -102,11 +103,7 @@ export async function usbHsmChallenge(ctx: UsbHsmAuthorizationContext): Promise<
 export async function usbHsmDeviceIdFromCredentialId(credentialIdB64Url: string): Promise<string> {
   const raw = base64UrlToBytes(credentialIdB64Url);
   const digest = await crypto.subtle.digest('SHA-256', raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength) as ArrayBuffer);
-  const hex = [...new Uint8Array(digest)]
-    .slice(0, 8)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('')
-    .toUpperCase();
+  const hex = bytesToHex(new Uint8Array(digest).subarray(0, 8)).toUpperCase();
   return `${USB_HSM_DEVICE_PREFIX}${hex}`;
 }
 

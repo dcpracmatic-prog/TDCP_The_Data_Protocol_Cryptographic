@@ -12,7 +12,7 @@
  * THIS IS THE SINGLE PACKAGE SPECIFICATION. Do not invent a parallel format.
  */
 
-import { computeSHA256, arrayBufferToBase64, TDCP_DEFAULT_PBKDF2_ITERATIONS } from '../crypto/primitives.ts';
+import { computeSHA256, bytesToHex, arrayBufferToBase64, TDCP_DEFAULT_PBKDF2_ITERATIONS } from '../crypto/primitives.ts';
 import type { PolicyLevel } from '../authorization/types.ts';
 import type { UltraCriticalABCBundle } from './ultra-critical.ts';
 
@@ -105,9 +105,7 @@ export async function deriveKeyWrappingKey(
   epoch: number,
   oracleWrapSecret: Uint8Array
 ): Promise<CryptoKey> {
-  const secretHex = Array.from(oracleWrapSecret)
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
+  const secretHex = bytesToHex(oracleWrapSecret);
   const contextInfo = new TextEncoder().encode(
     `TDCP-ENVELOPE-WRAP-v2.5::DOC:${documentId}::EPOCH:${epoch}::ORACLEWRAP:${secretHex}`
   );
