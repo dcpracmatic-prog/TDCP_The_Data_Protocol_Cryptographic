@@ -206,9 +206,9 @@ export async function deserializeTDCPPackage(data: ArrayBuffer | string): Promis
     }
 
     try {
-      const ivLength = new Uint8Array(atob(parsed.ivBase64).length).byteLength;
-      const saltLength = new Uint8Array(atob(parsed.saltBase64).length).byteLength;
-      const keyIvLength = new Uint8Array(atob(parsed.ivKeyBase64).length).byteLength;
+      const ivLength = atob(parsed.ivBase64).length;
+      const saltLength = atob(parsed.saltBase64).length;
+      const keyIvLength = atob(parsed.ivKeyBase64).length;
       if (ivLength !== 12 || keyIvLength !== 12 || saltLength < 16) {
         return { isValidEnvelope: false, error: 'Longitudes criptográficas inválidas (IV/salt).' };
       }
