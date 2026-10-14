@@ -14,6 +14,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { arrayBufferToBase64, base64ToArrayBuffer } from '../core/crypto/primitives.ts';
 
 export type ThemeMode = 'dark' | 'light' | 'system';
 
@@ -55,18 +56,13 @@ const PIN_VERIFY_KEY = 'tdcp.ui.historyPinVerify';
 
 const UiPrefsContext = createContext<UiPrefsState | null>(null);
 
+// Fast base64 encoding/decoding using optimized primitives (Node Buffer / chunked String.fromCharCode)
 function b64(buf: ArrayBuffer | Uint8Array): string {
-  const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
-  let s = '';
-  for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]!);
-  return btoa(s);
+  return arrayBufferToBase64(buf);
 }
 
 function fromB64(s: string): Uint8Array {
-  const bin = atob(s);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
+  return new Uint8Array(base64ToArrayBuffer(s));
 }
 
 async function deriveKey(pin: string, salt: Uint8Array): Promise<CryptoKey> {

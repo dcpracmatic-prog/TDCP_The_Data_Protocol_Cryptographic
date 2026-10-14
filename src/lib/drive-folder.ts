@@ -1,5 +1,7 @@
 /** Shared Google Drive folder helpers used by the server-side account API. */
 
+import { bytesToHex } from '../core/crypto/primitives.ts';
+
 export interface SharedDriveFolder {
   id: string;
   name: string;
@@ -15,7 +17,8 @@ export const CUSTOM_ID_PATTERN = /^[A-Z0-9-]{4,40}$/;
 export function generateCustomUserId(prefix = 'DCP-USR'): string {
   const bytes = new Uint8Array(4);
   crypto.getRandomValues(bytes);
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0').toUpperCase()).join('');
+  // Uses fast lookup-table bytesToHex to avoid Array.from, per-byte toString, and padStart calls
+  const hex = bytesToHex(bytes).toUpperCase();
   return `${prefix}-${hex.slice(0, 4)}-${hex.slice(4, 8)}`;
 }
 

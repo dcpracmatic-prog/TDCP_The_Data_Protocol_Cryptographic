@@ -8,6 +8,8 @@
  * Never holds the CSG damage master; the sidecar owns Notario state.
  */
 
+import { arrayBufferToBase64 } from '../core/crypto/primitives.ts';
+
 export interface CsgRemoteSeal {
   schema: string;
   evento_id: string;
@@ -48,11 +50,9 @@ function joinUrl(base: string, path: string): string {
   return `${b}${p}`;
 }
 
+// Fast base64 encoding using optimized primitives (Node Buffer / chunked String.fromCharCode)
 function toBase64(buf: ArrayBuffer | Uint8Array): string {
-  const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
-  let s = '';
-  for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]!);
-  return btoa(s);
+  return arrayBufferToBase64(buf);
 }
 
 export class CsgClient {

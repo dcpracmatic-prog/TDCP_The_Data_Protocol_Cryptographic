@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { bytesToHex } from '../core/crypto/primitives.ts';
 
 export const SECURITY_QUESTIONS = [
   '¿Cuál era el apodo que tenías de niño?',
@@ -80,13 +81,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Hash helper for client-side sovereign account authentication
+// Hash helper for client-side sovereign account authentication.
+// Uses fast lookup-table bytesToHex to avoid per-byte string allocation and padStart calls.
 async function hashSecret(secret: string): Promise<string> {
   const enc = new TextEncoder().encode(secret.trim().toLowerCase());
   const hashBuffer = await window.crypto.subtle.digest('SHA-256', enc);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+  return bytesToHex(new Uint8Array(hashBuffer));
 }
 
 const STORAGE_USERS_KEY = 'dcp_registered_users_db';
@@ -124,11 +124,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(db));
   };
 
-  // Generate unique custom ID
+  // Generate unique custom ID using fast lookup-table hex conversion
   const generateCustomUserId = (prefix: string = 'DCP-USR'): string => {
     const array = new Uint8Array(4);
     window.crypto.getRandomValues(array);
-    const hex = Array.from(array, byte => byte.toString(16).padStart(2, '0').toUpperCase()).join('');
+    const hex = bytesToHex(array).toUpperCase();
     return `${prefix}-${hex.slice(0, 4)}-${hex.slice(4, 8)}`;
   };
 
