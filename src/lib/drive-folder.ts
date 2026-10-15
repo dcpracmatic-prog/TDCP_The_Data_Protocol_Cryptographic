@@ -9,13 +9,15 @@ export interface SharedDriveFolder {
   addedAt: number;
 }
 
+import { bytesToHex } from '../core/crypto/primitives.ts';
+
 /** Canonical TDCP custom-user-id shape: uppercase letters, digits and hyphens. */
 export const CUSTOM_ID_PATTERN = /^[A-Z0-9-]{4,40}$/;
 
 export function generateCustomUserId(prefix = 'DCP-USR'): string {
   const bytes = new Uint8Array(4);
   crypto.getRandomValues(bytes);
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0').toUpperCase()).join('');
+  const hex = bytesToHex(bytes).toUpperCase();
   return `${prefix}-${hex.slice(0, 4)}-${hex.slice(4, 8)}`;
 }
 
