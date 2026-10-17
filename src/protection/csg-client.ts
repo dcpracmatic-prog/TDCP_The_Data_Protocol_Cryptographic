@@ -42,17 +42,20 @@ export interface CsgClientOptions {
   fetchImpl?: typeof fetch;
 }
 
+import { arrayBufferToBase64 } from '../core/crypto/primitives.ts';
+
 function joinUrl(base: string, path: string): string {
   const b = base.replace(/\/+$/, '');
   const p = path.startsWith('/') ? path : `/${path}`;
   return `${b}${p}`;
 }
 
+/**
+ * Fast Base64 encoding helper using optimized primitives.
+ * Replaces per-byte string concatenation loops for high throughput on large payloads.
+ */
 function toBase64(buf: ArrayBuffer | Uint8Array): string {
-  const u8 = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
-  let s = '';
-  for (let i = 0; i < u8.length; i++) s += String.fromCharCode(u8[i]!);
-  return btoa(s);
+  return arrayBufferToBase64(buf);
 }
 
 export class CsgClient {
