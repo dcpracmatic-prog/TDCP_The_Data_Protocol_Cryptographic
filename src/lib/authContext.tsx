@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { bytesToHex } from '../core/crypto/primitives.ts';
 
 export const SECURITY_QUESTIONS = [
   '¿Cuál era el apodo que tenías de niño?',
@@ -84,9 +85,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 async function hashSecret(secret: string): Promise<string> {
   const enc = new TextEncoder().encode(secret.trim().toLowerCase());
   const hashBuffer = await window.crypto.subtle.digest('SHA-256', enc);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+  // Optimization: use fast pre-computed lookup table primitive instead of Array.from + toString(16)
+  return bytesToHex(new Uint8Array(hashBuffer));
 }
 
 const STORAGE_USERS_KEY = 'dcp_registered_users_db';
@@ -128,7 +128,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const generateCustomUserId = (prefix: string = 'DCP-USR'): string => {
     const array = new Uint8Array(4);
     window.crypto.getRandomValues(array);
-    const hex = Array.from(array, byte => byte.toString(16).padStart(2, '0').toUpperCase()).join('');
+    // Optimization: use fast pre-computed lookup table primitive instead of Array.from + toString(16)
+    const hex = bytesToHex(array).toUpperCase();
     return `${prefix}-${hex.slice(0, 4)}-${hex.slice(4, 8)}`;
   };
 
