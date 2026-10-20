@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: tdcp-web
+    env: node
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm run preview
