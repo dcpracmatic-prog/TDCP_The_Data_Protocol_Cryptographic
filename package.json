@@ -11,7 +11,7 @@
     "build": "npm run build:channel-guardian && node --env-file-if-exists=.env scripts/with-app-env.mjs vite build && npm run db:migrate",
     "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
     "build:dev": "node scripts/with-app-env.mjs vite build --mode development",
-    "preview": "node --env-file-if-exists=.env scripts/with-app-env.mjs vite preview",
+    "preview": "node --env-file-if-exists=.env scripts/with-app-env.mjs vite preview --host 0.0.0.0 --port ${PORT:-8081}",
     "preview:restart": "node scripts/preview.mjs restart",
     "preview:stop": "node scripts/preview.mjs stop",
     "typecheck": "tsc --noEmit",
