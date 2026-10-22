@@ -14,7 +14,7 @@
  */
 
 import { policyRequiresUsbHsm } from '../core/authorization/usb-hsm.ts';
-import { createPolicyBinding, type EdgeSpec, type PolicyBinding } from '../channel/policy-binding.ts';
+import { type EdgeSpec, type PolicyBinding } from '../channel/policy-binding.ts';
 import {
   canonicalizeGrant,
   type AuthorizationGrant,
@@ -24,6 +24,7 @@ import type {
   PolicyLevel,
 } from '../core/authorization/types.ts';
 import {
+  computeSHA256,
   signDataECDSA,
   verifySignatureECDSA,
   generateRandomId,
@@ -107,14 +108,24 @@ export class AuthorizationOracle {
   }
 
   private async signPolicyBinding(policy: import('../channel/policy-binding.ts').ChannelPolicy): Promise<PolicyBinding> {
+    // Fast O(N) direct string comparison avoiding intermediate template string allocation & localeCompare in hot paths
+    const edges = [...policy.edges]
+      .map((e) => ({ source: e.source, destination: e.destination, expectedBytes: e.expectedBytes, allowed: e.allowed }))
+      .sort((a, b) => (
+        a.source < b.source ? -1 :
+        a.source > b.source ? 1 :
+        a.destination < b.destination ? -1 :
+        a.destination > b.destination ? 1 : 0
+      ));
+
     const canonical = JSON.stringify({
       documentId: policy.documentId,
       grantId: policy.grantId,
       expiry: policy.expiry,
-      edges: [...policy.edges].map((e) => ({ source: e.source, destination: e.destination, expectedBytes: e.expectedBytes, allowed: e.allowed }))
-        .sort((a, b) => `${a.source}->${a.destination}`.localeCompare(`${b.source}->${b.destination}`)),
+      edges,
     });
-    const hash = await (await import('../core/crypto/primitives.ts')).computeSHA256(canonical);
+    // Performance: Use top-level static import computeSHA256 instead of dynamic import() on every request
+    const hash = await computeSHA256(canonical);
     const signature = typeof this.keyStore.signCanonical === 'function'
       ? arrayBufferToBase64(await this.keyStore.signCanonical(canonical))
       : await signDataECDSA((await this.keyStore.getOrCreateSigningKey()).privateKey, canonical);
