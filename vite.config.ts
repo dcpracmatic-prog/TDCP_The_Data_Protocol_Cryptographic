@@ -152,8 +152,10 @@ export default defineConfig(({ command, isPreview }) => ({
     strictPort: true,
   },
   preview: {
-    host: "127.0.0.1",
-    port: 8081,
+    // Render/cloud deployment injects PORT and requires listening on 0.0.0.0.
+    // Local QA preview defaults to 127.0.0.1:8081.
+    host: process.env.HOST || (process.env.RENDER || process.env.PORT ? "0.0.0.0" : "127.0.0.1"),
+    port: Number(process.env.PORT) || 8081,
     strictPort: true,
   },
   resolve: { tsconfigPaths: true },
