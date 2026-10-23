@@ -13,11 +13,20 @@
  * the same files at startup instead (see src/lib/db.ts).
  */
 import { readdir, readFile } from "node:fs/promises";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import pg from "pg";
 import { pendingMigrations } from "./migration-plan.mjs";
+
+try {
+  const envFile = join(dirname(fileURLToPath(import.meta.url)), "..", ".env");
+  if (typeof process.loadEnvFile === "function" && existsSync(envFile)) {
+    process.loadEnvFile(envFile);
+  }
+} catch {
+  // Ignore .env read errors
+}
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
