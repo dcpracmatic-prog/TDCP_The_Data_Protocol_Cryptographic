@@ -14,7 +14,7 @@
  */
 
 import { policyRequiresUsbHsm } from '../core/authorization/usb-hsm.ts';
-import { createPolicyBinding, type EdgeSpec, type PolicyBinding } from '../channel/policy-binding.ts';
+import { canonicalizeChannelPolicy, type EdgeSpec, type PolicyBinding } from '../channel/policy-binding.ts';
 import {
   canonicalizeGrant,
   type AuthorizationGrant,
@@ -29,6 +29,7 @@ import {
   generateRandomId,
   generateRandomBytes,
   arrayBufferToBase64,
+  computeSHA256,
 } from '../core/crypto/primitives.ts';
 import { DeterministicPolicyEngine } from '../core/policy/policy-engine.ts';
 import { EpochRevocationManager } from '../core/revocation/epoch-manager.ts';
@@ -107,14 +108,9 @@ export class AuthorizationOracle {
   }
 
   private async signPolicyBinding(policy: import('../channel/policy-binding.ts').ChannelPolicy): Promise<PolicyBinding> {
-    const canonical = JSON.stringify({
-      documentId: policy.documentId,
-      grantId: policy.grantId,
-      expiry: policy.expiry,
-      edges: [...policy.edges].map((e) => ({ source: e.source, destination: e.destination, expectedBytes: e.expectedBytes, allowed: e.allowed }))
-        .sort((a, b) => `${a.source}->${a.destination}`.localeCompare(`${b.source}->${b.destination}`)),
-    });
-    const hash = await (await import('../core/crypto/primitives.ts')).computeSHA256(canonical);
+    // Optimization: reuse shared canonicalizeChannelPolicy function and top-level static computeSHA256 import
+    const canonical = canonicalizeChannelPolicy(policy);
+    const hash = await computeSHA256(canonical);
     const signature = typeof this.keyStore.signCanonical === 'function'
       ? arrayBufferToBase64(await this.keyStore.signCanonical(canonical))
       : await signDataECDSA((await this.keyStore.getOrCreateSigningKey()).privateKey, canonical);
