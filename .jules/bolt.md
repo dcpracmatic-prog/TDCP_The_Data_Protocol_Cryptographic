@@ -9,3 +9,7 @@
 ## 2025-05-20 - Map Insertion-Order Iteration for Cache Eviction
 **Learning:** Using `Array.from(map.entries()).sort(...)` during bounded cache eviction creates large array allocations and O(N log N) overhead per request when capacity is reached (~9ms per call at 50,000 items). JavaScript `Map` preserves insertion order natively, allowing O(1) eviction in ~0.001ms with zero allocations by iterating Map keys/entries directly.
 **Action:** Use native `Map` insertion-order iteration for bounded cache/registry eviction instead of converting to arrays and sorting.
+
+## 2025-05-21 - Top-level Static Imports in Hot Crypto Signing Paths
+**Learning:** Invoking dynamic `await import(...)` calls inside hot execution paths (such as grant signing or policy binding generation) adds Promise creation and module map resolution overhead (~18% latency overhead under load) even when the module is already cached. Using top-level static imports eliminates dynamic import overhead entirely.
+**Action:** Always import cryptographic primitives and helpers statically at top-level rather than dynamically importing them inside method bodies.
