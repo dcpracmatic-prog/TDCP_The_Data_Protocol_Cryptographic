@@ -13,3 +13,7 @@
 ## 2025-05-21 - Top-level Static Imports in Hot Crypto Signing Paths
 **Learning:** Invoking dynamic `await import(...)` calls inside hot execution paths (such as grant signing or policy binding generation) adds Promise creation and module map resolution overhead (~18% latency overhead under load) even when the module is already cached. Using top-level static imports eliminates dynamic import overhead entirely.
 **Action:** Always import cryptographic primitives and helpers statically at top-level rather than dynamically importing them inside method bodies.
+
+## 2025-05-22 - Memoize In-Render Iteration and Lift Static Array Allocations
+**Learning:** Re-evaluating inline array operations like `Array.from({ length: 24 })`, `filteredLogs.slice().reverse()`, and category filtering during React render cycles creates unnecessary garbage collection overhead and redundant computations on every state update or progress event. Lifting static arrays to module scope and wrapping derived array lists in `useMemo` prevents unnecessary allocations and keeps UI render ticks lightweight.
+**Action:** Lift constant UI arrays to top-level module scope and wrap derived filtering/reversing operations in `useMemo` with minimal dependency arrays.

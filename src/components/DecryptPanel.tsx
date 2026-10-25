@@ -40,6 +40,9 @@ import {
 
 type ViewerType = 'image' | 'video' | 'audio' | 'pdf' | 'text' | 'download' | 'error';
 
+/** Static tile array for forensic watermark overlay — avoids per-render Array.from allocations */
+const WATERMARK_TILES = Array.from({ length: 24 }, (_, i) => i);
+
 /** Independent Smart Token mode (does not go through Gatekeeper). */
 type StpRemoteRef = {
   schema: 'tdcp.stp-remote-ref.v1';
@@ -820,7 +823,7 @@ export default function DecryptPanel() {
 
               {result.watermark && result.type !== 'error' && (
                 <div className="pointer-events-none absolute inset-0 z-30 flex -rotate-12 flex-wrap content-center justify-center gap-x-10 gap-y-12 overflow-hidden p-4 select-none">
-                  {Array.from({ length: 24 }).map((_, i) => (
+                  {WATERMARK_TILES.map((i) => (
                     <div key={i} className="flex flex-col items-center p-2 text-center font-mono">
                       <span className="text-[10px] font-extrabold tracking-widest text-emerald-400 uppercase">
                         TDCP FORENSIC
