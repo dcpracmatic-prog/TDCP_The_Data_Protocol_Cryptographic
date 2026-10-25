@@ -24,6 +24,7 @@ import type {
   PolicyLevel,
 } from '../core/authorization/types.ts';
 import {
+  computeSHA256,
   signDataECDSA,
   verifySignatureECDSA,
   generateRandomId,
@@ -114,7 +115,8 @@ export class AuthorizationOracle {
       edges: [...policy.edges].map((e) => ({ source: e.source, destination: e.destination, expectedBytes: e.expectedBytes, allowed: e.allowed }))
         .sort((a, b) => `${a.source}->${a.destination}`.localeCompare(`${b.source}->${b.destination}`)),
     });
-    const hash = await (await import('../core/crypto/primitives.ts')).computeSHA256(canonical);
+    // Optimization: use top-level static import instead of dynamic import() in hot grant signing path.
+    const hash = await computeSHA256(canonical);
     const signature = typeof this.keyStore.signCanonical === 'function'
       ? arrayBufferToBase64(await this.keyStore.signCanonical(canonical))
       : await signDataECDSA((await this.keyStore.getOrCreateSigningKey()).privateKey, canonical);
