@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { FlaskConical, CheckCircle, XCircle, ShieldAlert, Play } from 'lucide-react';
 import { runTDCPTestSuite, type TestCaseResult, type TestSuiteSummary } from '../test/tdcp-test-runner.ts';
 import CollapsibleSection from './CollapsibleSection.tsx';
@@ -57,17 +57,20 @@ export default function ValidationPanel() {
     }
   };
 
-  const grouped = CATEGORIES.map((cat) => {
-    const tests = summary?.results.filter((r) => {
-      if (cat === 'DEVICE BINDING') return r.name.toLowerCase().includes('dispositivo') || r.name.toLowerCase().includes('device');
-      if (cat === 'CREDENTIAL BINDING') return r.name.toLowerCase().includes('credencial') || r.name.toLowerCase().includes('credential');
-      if (cat === 'ANTI-REPLAY') return r.category === 'REPLAY' || r.name.toLowerCase().includes('replay');
-      return mapCategory(r.category) === cat;
+  // Memoize grouped categories so progress updates during test execution do not re-filter/re-map on every tick
+  const grouped = useMemo(() => {
+    return CATEGORIES.map((cat) => {
+      const tests = summary?.results.filter((r) => {
+        if (cat === 'DEVICE BINDING') return r.name.toLowerCase().includes('dispositivo') || r.name.toLowerCase().includes('device');
+        if (cat === 'CREDENTIAL BINDING') return r.name.toLowerCase().includes('credencial') || r.name.toLowerCase().includes('credential');
+        if (cat === 'ANTI-REPLAY') return r.category === 'REPLAY' || r.name.toLowerCase().includes('replay');
+        return mapCategory(r.category) === cat;
+      });
+      const pass = tests?.filter((t) => t.status === 'PASS').length ?? 0;
+      const total = tests?.length ?? 0;
+      return { cat, tests: tests ?? [], pass, total };
     });
-    const pass = tests?.filter((t) => t.status === 'PASS').length ?? 0;
-    const total = tests?.length ?? 0;
-    return { cat, tests: tests ?? [], pass, total };
-  });
+  }, [summary]);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">

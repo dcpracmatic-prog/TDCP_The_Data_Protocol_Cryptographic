@@ -125,6 +125,11 @@ export default function MonitorPanel() {
     });
   }, [auditLogs, searchQuery]);
 
+  // Memoize reversed logs array to avoid slice().reverse() allocations on every render / selection toggle
+  const reversedFilteredLogs = useMemo(() => {
+    return filteredLogs.slice().reverse();
+  }, [filteredLogs]);
+
   const stats = {
     total: auditLogs.length,
     success: auditLogs.filter((e) => e.result === 'SUCCESS').length,
@@ -372,16 +377,13 @@ export default function MonitorPanel() {
               />
             </div>
             <div className="flex-1 space-y-2 overflow-y-auto pr-1">
-              {filteredLogs.length === 0 ? (
+              {reversedFilteredLogs.length === 0 ? (
                 <div className="flex h-28 flex-col items-center justify-center rounded-xl border border-dashed border-white/10 bg-black/20 p-4 text-center">
                   <Database className="mb-1.5 h-6 w-6 text-white/20" />
                   <p className="text-[11px] text-white/50">Sin eventos todavía.</p>
                 </div>
               ) : (
-                filteredLogs
-                  .slice()
-                  .reverse()
-                  .map((entry) => (
+                reversedFilteredLogs.map((entry) => (
                     <button
                       key={entry.eventId}
                       type="button"
