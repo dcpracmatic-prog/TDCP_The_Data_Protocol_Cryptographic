@@ -14,7 +14,7 @@
  */
 
 import { policyRequiresUsbHsm } from '../core/authorization/usb-hsm.ts';
-import { createPolicyBinding, type EdgeSpec, type PolicyBinding } from '../channel/policy-binding.ts';
+import { canonicalizeChannelPolicy, createPolicyBinding, type EdgeSpec, type PolicyBinding } from '../channel/policy-binding.ts';
 import {
   canonicalizeGrant,
   type AuthorizationGrant,
@@ -108,14 +108,9 @@ export class AuthorizationOracle {
   }
 
   private async signPolicyBinding(policy: import('../channel/policy-binding.ts').ChannelPolicy): Promise<PolicyBinding> {
-    const canonical = JSON.stringify({
-      documentId: policy.documentId,
-      grantId: policy.grantId,
-      expiry: policy.expiry,
-      edges: [...policy.edges].map((e) => ({ source: e.source, destination: e.destination, expectedBytes: e.expectedBytes, allowed: e.allowed }))
-        .sort((a, b) => `${a.source}->${a.destination}`.localeCompare(`${b.source}->${b.destination}`)),
-    });
-    // Optimization: use top-level static import instead of dynamic import() in hot grant signing path.
+    // Optimization: reuse top-level static `canonicalizeChannelPolicy` helper to avoid duplicate JSON logic,
+    // template string array allocations, and localeCompare overhead during grant signing.
+    const canonical = canonicalizeChannelPolicy(policy);
     const hash = await computeSHA256(canonical);
     const signature = typeof this.keyStore.signCanonical === 'function'
       ? arrayBufferToBase64(await this.keyStore.signCanonical(canonical))
