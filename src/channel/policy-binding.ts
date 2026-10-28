@@ -35,10 +35,18 @@ export interface GrantWithChannelBinding {
   channelPolicyBinding?: PolicyBinding;
 }
 
+/**
+ * Fast canonical policy JSON formatting with zero string allocation during sort.
+ * Direct field comparisons (< / >) avoid temporary string template creation and localeCompare overhead.
+ */
 export function canonicalizeChannelPolicy(policy: ChannelPolicy): string {
   const edges = [...policy.edges]
     .map((e) => ({ source: e.source, destination: e.destination, expectedBytes: e.expectedBytes, allowed: e.allowed }))
-    .sort((a, b) => `${a.source}->${a.destination}`.localeCompare(`${b.source}->${b.destination}`));
+    .sort((a, b) => {
+      if (a.source !== b.source) return a.source < b.source ? -1 : 1;
+      if (a.destination !== b.destination) return a.destination < b.destination ? -1 : 1;
+      return 0;
+    });
   return JSON.stringify({ documentId: policy.documentId, grantId: policy.grantId, expiry: policy.expiry, edges });
 }
 

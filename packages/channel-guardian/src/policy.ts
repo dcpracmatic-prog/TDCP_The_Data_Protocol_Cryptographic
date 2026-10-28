@@ -27,7 +27,7 @@ function safeEqualHex(a: string, b: string): boolean {
   return timingSafeEqual(bufA, bufB);
 }
 
-/** Deterministic canonical serialization of a ChannelPolicy. */
+/** Deterministic canonical serialization of a ChannelPolicy (zero string template allocation in sort). */
 export function canonicalizePolicy(policy: ChannelPolicy): string {
   const edges = [...policy.edges]
     .map((e) => ({
@@ -37,9 +37,9 @@ export function canonicalizePolicy(policy: ChannelPolicy): string {
       allowed: e.allowed,
     }))
     .sort((a, b) => {
-      const ka = `${a.source}->${a.destination}`;
-      const kb = `${b.source}->${b.destination}`;
-      return ka < kb ? -1 : ka > kb ? 1 : 0;
+      if (a.source !== b.source) return a.source < b.source ? -1 : 1;
+      if (a.destination !== b.destination) return a.destination < b.destination ? -1 : 1;
+      return 0;
     });
 
   return JSON.stringify({
