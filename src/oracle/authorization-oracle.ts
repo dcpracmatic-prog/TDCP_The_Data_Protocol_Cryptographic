@@ -14,7 +14,7 @@
  */
 
 import { policyRequiresUsbHsm } from '../core/authorization/usb-hsm.ts';
-import { createPolicyBinding, type EdgeSpec, type PolicyBinding } from '../channel/policy-binding.ts';
+import { type EdgeSpec, type PolicyBinding } from '../channel/policy-binding.ts';
 import {
   canonicalizeGrant,
   type AuthorizationGrant,
@@ -113,7 +113,7 @@ export class AuthorizationOracle {
       grantId: policy.grantId,
       expiry: policy.expiry,
       edges: [...policy.edges].map((e) => ({ source: e.source, destination: e.destination, expectedBytes: e.expectedBytes, allowed: e.allowed }))
-        .sort((a, b) => `${a.source}->${a.destination}`.localeCompare(`${b.source}->${b.destination}`)),
+        .sort((a, b) => a.source < b.source ? -1 : a.source > b.source ? 1 : a.destination < b.destination ? -1 : a.destination > b.destination ? 1 : 0),
     });
     // Optimization: use top-level static import instead of dynamic import() in hot grant signing path.
     const hash = await computeSHA256(canonical);

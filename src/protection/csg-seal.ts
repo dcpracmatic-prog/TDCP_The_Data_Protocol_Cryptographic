@@ -166,7 +166,7 @@ export async function createCsgOperationSeal(input: {
     operation: input.operation,
     expiresAt: input.expiresAt,
     edges: [...input.edges].sort((a, b) =>
-      `${a.source}->${a.destination}`.localeCompare(`${b.source}->${b.destination}`),
+      a.source < b.source ? -1 : a.source > b.source ? 1 : a.destination < b.destination ? -1 : a.destination > b.destination ? 1 : 0,
     ),
   });
   const client = csgClientFromEnv();
