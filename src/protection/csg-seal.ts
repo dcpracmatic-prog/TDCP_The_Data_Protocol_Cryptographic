@@ -165,9 +165,13 @@ export async function createCsgOperationSeal(input: {
     operationId: input.operationId,
     operation: input.operation,
     expiresAt: input.expiresAt,
-    edges: [...input.edges].sort((a, b) =>
-      `${a.source}->${a.destination}`.localeCompare(`${b.source}->${b.destination}`),
-    ),
+    // Optimization: direct field comparison avoids template string allocations (`${source}->${destination}`)
+    // and slow `localeCompare` engine calls during edge sorting in operation seal canonicalization.
+    edges: [...input.edges].sort((a, b) => {
+      if (a.source !== b.source) return a.source < b.source ? -1 : 1;
+      if (a.destination !== b.destination) return a.destination < b.destination ? -1 : 1;
+      return 0;
+    }),
   });
   const client = csgClientFromEnv();
   if (client) {

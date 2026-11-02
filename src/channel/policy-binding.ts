@@ -36,9 +36,15 @@ export interface GrantWithChannelBinding {
 }
 
 export function canonicalizeChannelPolicy(policy: ChannelPolicy): string {
+  // Optimization: direct field comparison avoids template string allocations (`${source}->${destination}`)
+  // and slow `localeCompare` engine calls during edge sorting in hot policy canonicalization path.
   const edges = [...policy.edges]
     .map((e) => ({ source: e.source, destination: e.destination, expectedBytes: e.expectedBytes, allowed: e.allowed }))
-    .sort((a, b) => `${a.source}->${a.destination}`.localeCompare(`${b.source}->${b.destination}`));
+    .sort((a, b) => {
+      if (a.source !== b.source) return a.source < b.source ? -1 : 1;
+      if (a.destination !== b.destination) return a.destination < b.destination ? -1 : 1;
+      return 0;
+    });
   return JSON.stringify({ documentId: policy.documentId, grantId: policy.grantId, expiry: policy.expiry, edges });
 }
 
