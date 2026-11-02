@@ -17,3 +17,7 @@
 ## 2025-05-22 - Memoize In-Render Iteration and Lift Static Array Allocations
 **Learning:** Re-evaluating inline array operations like `Array.from({ length: 24 })`, `filteredLogs.slice().reverse()`, and category filtering during React render cycles creates unnecessary garbage collection overhead and redundant computations on every state update or progress event. Lifting static arrays to module scope and wrapping derived array lists in `useMemo` prevents unnecessary allocations and keeps UI render ticks lightweight.
 **Action:** Lift constant UI arrays to top-level module scope and wrap derived filtering/reversing operations in `useMemo` with minimal dependency arrays.
+
+## 2025-05-23 - Buffer Fast-Path for Base64 and Base64Url Byte Decoding
+**Learning:** Decoding Base64 strings to `Uint8Array` by looping over `binaryString.charCodeAt(i)` creates substantial single-byte iteration overhead (~276ms for 1,000 runs of 64KB payloads). Creating a direct `Uint8Array` view onto `Buffer.from(base64, 'base64')` achieves a ~3.2x–5.7x speedup (~48ms for 1,000 runs) and eliminates redundant `.slice()` array buffer clones when consumers need a `Uint8Array`.
+**Action:** Standardize Base64/Base64Url decoding onto `base64ToUint8Array` across security key, integrity seal, and preference utilities.

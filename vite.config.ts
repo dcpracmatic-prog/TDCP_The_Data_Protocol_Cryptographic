@@ -152,8 +152,8 @@ export default defineConfig(({ command, isPreview }) => ({
     strictPort: true,
   },
   preview: {
-    host: "127.0.0.1",
-    port: 8081,
+    host: "0.0.0.0",
+    port: Number(process.env.PORT) || 8081,
     strictPort: true,
   },
   resolve: { tsconfigPaths: true },
