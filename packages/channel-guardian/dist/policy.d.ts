@@ -9,7 +9,7 @@
  */
 import { KeyObject } from "node:crypto";
 import type { ChannelPolicy, EdgeSpec, PolicyBinding } from "./types.js";
-/** Deterministic canonical serialization of a ChannelPolicy. */
+/** Deterministic canonical serialization of a ChannelPolicy (zero string template allocation in sort). */
 export declare function canonicalizePolicy(policy: ChannelPolicy): string;
 export declare function policyHash(canonical: string): string;
 /**
