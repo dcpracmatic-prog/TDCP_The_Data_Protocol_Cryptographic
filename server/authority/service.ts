@@ -10,7 +10,7 @@ import type {
   AuthorizationRequest,
   DocumentRevocationState,
 } from '../../src/core/authorization/types.ts';
-import { arrayBufferToBase64, base64ToArrayBuffer } from '../../src/core/crypto/primitives.ts';
+import { arrayBufferToBase64, base64ToUint8Array } from '../../src/core/crypto/primitives.ts';
 import { InProcessAuthority } from '../../src/authority/in-process-authority.ts';
 import type { AuthorityPublicInfo } from '../../src/authority/types.ts';
 import { DurableJsonAuthorityStore, type DurableAuthoritySnapshot } from './durable-store.ts';
@@ -25,8 +25,9 @@ function bytesToBase64(bytes: Uint8Array): string {
   return arrayBufferToBase64(bytes);
 }
 
+/** Fast base64 to Uint8Array leveraging native buffer view without redundant ArrayBuffer slice */
 function base64ToBytes(b64: string): Uint8Array {
-  return new Uint8Array(base64ToArrayBuffer(b64));
+  return base64ToUint8Array(b64);
 }
 
 export interface DurableAuthorityServiceOptions {
