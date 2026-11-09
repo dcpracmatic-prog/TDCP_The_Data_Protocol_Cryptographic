@@ -12,7 +12,7 @@
  * THIS IS THE SINGLE PACKAGE SPECIFICATION. Do not invent a parallel format.
  */
 
-import { computeSHA256, bytesToHex, arrayBufferToBase64, base64ToArrayBuffer, TDCP_DEFAULT_PBKDF2_ITERATIONS } from '../crypto/primitives.ts';
+import { computeSHA256, bytesToHex, arrayBufferToBase64, base64ToByteLength, TDCP_DEFAULT_PBKDF2_ITERATIONS } from '../crypto/primitives.ts';
 import type { PolicyLevel } from '../authorization/types.ts';
 import type { UltraCriticalABCBundle } from './ultra-critical.ts';
 
@@ -206,10 +206,10 @@ export async function deserializeTDCPPackage(data: ArrayBuffer | string): Promis
     }
 
     try {
-      // Optimization: use base64ToArrayBuffer directly instead of allocating dummy Uint8Array buffers via atob length
-      const ivLength = base64ToArrayBuffer(parsed.ivBase64).byteLength;
-      const saltLength = base64ToArrayBuffer(parsed.saltBase64).byteLength;
-      const keyIvLength = base64ToArrayBuffer(parsed.ivKeyBase64).byteLength;
+      // Optimization: calculate decoded byte length with zero buffer allocations via base64ToByteLength
+      const ivLength = base64ToByteLength(parsed.ivBase64);
+      const saltLength = base64ToByteLength(parsed.saltBase64);
+      const keyIvLength = base64ToByteLength(parsed.ivKeyBase64);
       if (ivLength !== 12 || keyIvLength !== 12 || saltLength < 16) {
         return { isValidEnvelope: false, error: 'Longitudes criptográficas inválidas (IV/salt).' };
       }
