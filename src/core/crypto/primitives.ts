@@ -35,7 +35,7 @@ export function bytesToHex(bytes: Uint8Array): string {
 }
 
 /** Narrow Uint8Array for DOM lib BufferSource (TS 5.7+ ArrayBufferLike). */
-function asBufferSource(data: Uint8Array | ArrayBuffer): BufferSource {
+export function asBufferSource(data: Uint8Array | ArrayBuffer): BufferSource {
   if (data instanceof ArrayBuffer) return data;
   return data as unknown as BufferSource;
 }
@@ -233,11 +233,13 @@ export async function verifySignatureECDSA(
   data: string
 ): Promise<boolean> {
   try {
-    const sigBuffer = base64ToArrayBuffer(signatureBase64);
+    // Optimization: decode signature directly to Uint8Array BufferSource view,
+    // avoiding redundant ArrayBuffer slice allocations in base64ToArrayBuffer.
+    const sigBuffer = base64ToUint8Array(signatureBase64);
     return await crypto.subtle.verify(
       { name: 'ECDSA', hash: { name: 'SHA-256' } },
       publicKey,
-      sigBuffer,
+      asBufferSource(sigBuffer),
       encoder.encode(data)
     );
   } catch {

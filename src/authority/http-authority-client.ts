@@ -17,7 +17,7 @@ import type {
   PublicKeyCredentialCreationOptionsJSON,
   RegistrationResponseJSON,
 } from '@simplewebauthn/browser';
-import { base64ToArrayBuffer, arrayBufferToBase64 } from '../core/crypto/primitives.ts';
+import { base64ToUint8Array, arrayBufferToBase64, asBufferSource } from '../core/crypto/primitives.ts';
 import type {
   AuthorityAuthResult,
   AuthorizationAuthority,
@@ -47,10 +47,12 @@ export interface HttpAuthorityClientOptions {
 export const USER_TOKEN_HEADER = 'x-tdcp-user-token';
 
 async function importSpkiPublicKey(spkiBase64: string): Promise<CryptoKey> {
-  const spki = base64ToArrayBuffer(spkiBase64);
+  // Optimization: SubtleCrypto.importKey accepts Uint8Array directly;
+  // using base64ToUint8Array avoids ArrayBuffer.slice allocations.
+  const spki = base64ToUint8Array(spkiBase64);
   return crypto.subtle.importKey(
     'spki',
-    spki,
+    asBufferSource(spki),
     { name: 'ECDSA', namedCurve: 'P-256' },
     true,
     ['verify']
@@ -173,7 +175,8 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
           policy,
           { admin: true }
         );
-    return new Uint8Array(base64ToArrayBuffer(res.wrapSecretBase64));
+    // Optimization: decode base64 directly to Uint8Array without redundant ArrayBuffer slice
+    return base64ToUint8Array(res.wrapSecretBase64);
   }
 
   public async getDocumentPolicy(
@@ -219,7 +222,8 @@ export class HttpAuthorityClient implements AuthorizationAuthority {
         { grant }
       );
       if (!res.wrapSecretBase64) return null;
-      return new Uint8Array(base64ToArrayBuffer(res.wrapSecretBase64));
+      // Optimization: decode base64 directly to Uint8Array without redundant ArrayBuffer slice
+      return base64ToUint8Array(res.wrapSecretBase64);
     } catch {
       return null;
     }
