@@ -21,3 +21,7 @@
 ## 2025-05-23 - Buffer Fast-Path for Base64 and Base64Url Byte Decoding
 **Learning:** Decoding Base64 strings to `Uint8Array` by looping over `binaryString.charCodeAt(i)` creates substantial single-byte iteration overhead (~276ms for 1,000 runs of 64KB payloads). Creating a direct `Uint8Array` view onto `Buffer.from(base64, 'base64')` achieves a ~3.2x–5.7x speedup (~48ms for 1,000 runs) and eliminates redundant `.slice()` array buffer clones when consumers need a `Uint8Array`.
 **Action:** Standardize Base64/Base64Url decoding onto `base64ToUint8Array` across security key, integrity seal, and preference utilities.
+
+## 2025-05-24 - Zero-Allocation Base64 Decoded Byte Length Calculation
+**Learning:** Decoding Base64 strings to `ArrayBuffer` or `Uint8Array` solely to check `.byteLength` (e.g. validating cryptographic parameter lengths in package headers) causes needless allocations and GC pressure (~146ms for 100k operations). Validating the Base64 format and calculating byte length via bitwise arithmetic `(len * 3 >>> 2) - padding` eliminates allocations entirely and yields a ~14x speedup (~10ms for 100k operations).
+**Action:** Use zero-allocation `base64ToByteLength` whenever validating Base64 parameter lengths without needing the actual decoded bytes.
