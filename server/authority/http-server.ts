@@ -285,7 +285,7 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
       }
 
       if (method === 'GET' && (path === '/ready' || path === '/readyz')) {
-        const readiness = service.getReadiness();
+        const readiness = await service.getReadiness();
         const status = readiness.ready ? 200 : 503;
         sendJson(
           res,

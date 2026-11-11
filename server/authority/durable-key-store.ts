@@ -5,8 +5,7 @@
  */
 
 import type { OracleKeyStore } from '../../src/oracle/oracle-key-store.ts';
-import type { DurableAuthoritySnapshot } from './durable-store.ts';
-import { DurableJsonAuthorityStore } from './durable-store.ts';
+import type { DurableAuthoritySnapshot, DurableAuthorityStore } from './durable-store.ts';
 
 export class DurableFileOracleKeyStore implements OracleKeyStore {
   public readonly kind = 'DEVELOPMENT_IN_MEMORY' as const;
@@ -17,15 +16,18 @@ export class DurableFileOracleKeyStore implements OracleKeyStore {
   private readonly keyId: string;
   private privateJwk: JsonWebKey | null;
   private publicJwk: JsonWebKey | null;
-  private readonly onPersist: (privateJwk: JsonWebKey, publicJwk: JsonWebKey) => void;
+  private readonly onPersist: (
+    privateJwk: JsonWebKey,
+    publicJwk: JsonWebKey
+  ) => void | Promise<void>;
 
   constructor(
     snapshot: Pick<
       DurableAuthoritySnapshot,
       'keyId' | 'signingPrivateJwk' | 'signingPublicJwk' | 'signingPrivateJwkEnc'
     >,
-    onPersist: (privateJwk: JsonWebKey, publicJwk: JsonWebKey) => void,
-    store?: DurableJsonAuthorityStore
+    onPersist: (privateJwk: JsonWebKey, publicJwk: JsonWebKey) => void | Promise<void>,
+    store?: DurableAuthorityStore
   ) {
     this.keyId = snapshot.keyId || 'AUTHORITY-KEY-P256-DURABLE-DEV';
     this.publicJwk = snapshot.signingPublicJwk;
@@ -77,7 +79,10 @@ export class DurableFileOracleKeyStore implements OracleKeyStore {
     );
     this.privateJwk = await crypto.subtle.exportKey('jwk', this.keyPair.privateKey);
     this.publicJwk = await crypto.subtle.exportKey('jwk', this.keyPair.publicKey);
-    this.onPersist(this.privateJwk, this.publicJwk);
+    // Awaited: with the Postgres store the key must be durable before the
+    // Authority reports itself initialized — otherwise a crash right after
+    // key generation could lose the only copy of the signing key.
+    await this.onPersist(this.privateJwk, this.publicJwk);
     return this.keyPair;
   }
 
