@@ -163,7 +163,10 @@ export default function DecryptPanel() {
     setPkg(parsed.package);
     setArtifactKind('tdcp');
     setLogs(
-      `TDCPPackage válido.\nDOC=${parsed.package.documentId}\nPKG=${parsed.package.packageId}\nPOL=${parsed.package.metadata.policyLevel}\nEl archivo no autoriza. Siga: operación → credencial → dispositivo → Gatekeeper.`
+      `TDCPPackage válido.\nDOC=${parsed.package.documentId}\nPKG=${parsed.package.packageId}\nPOL=${parsed.package.metadata.policyLevel}\nEl archivo no autoriza. Siga: operación → credencial → dispositivo → Gatekeeper.` +
+        (parsed.package.csgSeal
+          ? '\n[CSG] Sello incrustado presente: el Gatekeeper lo verificará antes de descifrar.'
+          : '\n[CSG] Sin sello incrustado (paquete legacy): abre por el camino actual, sin garantía CSG.')
     );
   };
 

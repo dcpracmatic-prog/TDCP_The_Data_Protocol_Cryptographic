@@ -38,3 +38,21 @@ export VITE_CSG_SEAL_URL=http://127.0.0.1:8010
 - EncryptPanel / DecryptPanel use `createCsgSeal` / `verifyCsgSeal`
 
 When `VITE_CSG_SEAL_URL` is unset, TDCP uses the local development seal (`tdcp.csg-local.v1`).
+
+## P2-5: package seal (the .pkg carries its own seal)
+
+This sidecar is the Python implementation of the same contract as the
+upstream Rust `csg-sidecar` (Ed25519 + SHA3-256, `csg.sello.v1`, same
+endpoints and field names) — not a second crypto design. The P2-5 wiring
+uses it directly:
+
+- **Protect:** `createTDCPPackage({ csgSeal: 'required' | 'optional' | 'off' })`
+  seals the canonical envelope bytes and stores the seal in `pkg.csgSeal`
+  (`src/core/package/csg-package-seal.ts`). Only the remote sidecar counts;
+  there is deliberately NO local-seal fallback for a package seal.
+- **Open:** the Gatekeeper verifies `csgSeal` BEFORE decrypting and BEFORE
+  consuming a one-time grant; a present-but-invalid or unverifiable seal
+  fails closed (`CSG_PACKAGE_SEAL_FAILED`). Legacy packages without a seal
+  still open, documented as having no CSG guarantee.
+- **Smoke:** `npm run smoke:csg-pkg` (starts this sidecar on a temp data
+  dir; requires `python3` + `cryptography`).

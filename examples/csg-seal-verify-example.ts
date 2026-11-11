@@ -5,10 +5,15 @@
  *
  * Requires the Rust CSG sidecar running on loopback:
  *   cd <CSG repo>/sidecar && CSG_PORT=8010 ./target/release/csg-sidecar
+ * (or the in-repo Python sidecar: python3 server/csg-sidecar/main.py)
  *
  * Usage (from repo root, with Node that supports strip-types):
  *   CSG_SEAL_URL=http://127.0.0.1:8010 \
  *   node --experimental-strip-types examples/csg-seal-verify-example.ts
+ *
+ * For the full package flow (seal embedded in the .pkg, verified by the
+ * Gatekeeper before decrypt), see scripts/csg-pkg-smoke.mjs
+ * (`npm run smoke:csg-pkg`).
  */
 
 import { CsgClient, csgClientFromEnv } from '../src/protection/csg-client.ts';

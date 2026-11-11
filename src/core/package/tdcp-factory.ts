@@ -28,6 +28,7 @@ import {
   deriveKeyWrappingKey,
   computePackageIntegrityHash,
 } from './package-format.ts';
+import { sealPackage, attachPackageSeal, type CsgPackageSealMode } from './csg-package-seal.ts';
 import type { TDCPPackage } from './package-format.ts';
 import { splitIntoABCFragments } from './ultra-critical.ts';
 
@@ -58,6 +59,14 @@ export interface CreateTDCPPackageInput {
   authority?: AuthorizationAuthority;
   /** @deprecated Prefer `authority`. Kept for existing callers/tests. */
   oracle?: AuthorizationOracle;
+  /**
+   * CSG package seal (P2-5). Default `optional`: seal with the remote Notario
+   * when the sidecar is configured and answers; otherwise the package is
+   * created WITHOUT a seal (legacy shape, documented as "no CSG guarantee").
+   * `required`: sidecar down/rejected => creation throws, no package.
+   * `off`: never seal. Only the remote sidecar counts — never a local seal.
+   */
+  csgSeal?: CsgPackageSealMode;
 }
 
 /**
@@ -204,5 +213,16 @@ export async function createTDCPPackage(input: CreateTDCPPackageInput): Promise<
   };
 
   pkg.integrityHash = await computePackageIntegrityHash(pkg);
+
+  // P2-5: seal the finished envelope with the CSG Notario and store the seal
+  // inside the package. The seal covers the canonical envelope bytes
+  // (structure + full content). `required` throws when the sidecar cannot
+  // seal — no silently unsealed package. `optional` (default) leaves the
+  // package unsealed when the sidecar is absent, as a documented legacy.
+  const sealMode: CsgPackageSealMode = input.csgSeal ?? 'optional';
+  const sealResult = await sealPackage(pkg, sealMode);
+  if (sealResult.sealed && sealResult.seal) {
+    return attachPackageSeal(pkg, sealResult.seal);
+  }
   return pkg;
 }
