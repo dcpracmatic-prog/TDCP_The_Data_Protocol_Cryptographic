@@ -6,7 +6,7 @@
  * When a CSG_SEAL_URL sidecar exists, callers may swap to remote sealing.
  */
 
-import { bytesToHex, arrayBufferToBase64, base64ToUint8Array } from '../core/crypto/primitives.ts';
+import { bytesToHex, arrayBufferToBase64, base64ToUint8Array, asBufferSource } from '../core/crypto/primitives.ts';
 
 export interface CsgLocalSeal {
   schema: 'tdcp.csg-local.v1';
@@ -46,7 +46,7 @@ function fromB64(s: string): Uint8Array {
 
 async function sha256Hex(data: ArrayBuffer | Uint8Array): Promise<string> {
   const u8 = data instanceof Uint8Array ? data : new Uint8Array(data);
-  const dig = await crypto.subtle.digest('SHA-256', u8.buffer as ArrayBuffer);
+  const dig = await crypto.subtle.digest('SHA-256', asBufferSource(u8));
   return bytesToHex(new Uint8Array(dig));
 }
 
@@ -85,7 +85,7 @@ export async function createLocalCsgSeal(
   const signature = await crypto.subtle.sign(
     { name: 'ECDSA', hash: 'SHA-256' },
     keyPair.privateKey,
-    toSign.buffer as ArrayBuffer
+    asBufferSource(toSign)
   );
 
   return {
@@ -119,7 +119,7 @@ export async function verifyLocalCsgSeal(
     const spki = fromB64(seal.publicKeySpkiBase64);
     const key = await crypto.subtle.importKey(
       'spki',
-      spki.buffer as ArrayBuffer,
+      asBufferSource(spki),
       { name: 'ECDSA', namedCurve: 'P-256' },
       false,
       ['verify']
@@ -129,8 +129,8 @@ export async function verifyLocalCsgSeal(
     const ok = await crypto.subtle.verify(
       { name: 'ECDSA', hash: 'SHA-256' },
       key,
-      sig.buffer as ArrayBuffer,
-      toSign.buffer as ArrayBuffer
+      asBufferSource(sig),
+      asBufferSource(toSign)
     );
     return ok ? { valid: true, reason: 'OK' } : { valid: false, reason: 'SIGNATURE_INVALID' };
   } catch {
