@@ -13,7 +13,8 @@ import type {
 import { arrayBufferToBase64, base64ToUint8Array } from '../../src/core/crypto/primitives.ts';
 import { InProcessAuthority } from '../../src/authority/in-process-authority.ts';
 import type { AuthorityPublicInfo } from '../../src/authority/types.ts';
-import { DurableJsonAuthorityStore, type DurableAuthoritySnapshot } from './durable-store.ts';
+import { DurableJsonAuthorityStore, emptyAuthoritySnapshot, type DurableAuthoritySnapshot, type DurableAuthorityStore } from './durable-store.ts';
+import { createAuthorityStoreFromEnv } from './postgres-store.ts';
 import { UsbHsmRegistry, loadUsbHsmConfigFromEnv, type UsbHsmConfig } from './usb-hsm.ts';
 import {
   createAuthoritySigningKeyStore,
@@ -37,6 +38,12 @@ export interface DurableAuthorityServiceOptions {
   requireSubject?: boolean;
   /** WebAuthn relying-party config for USB-HSM (env when omitted). */
   usbHsm?: UsbHsmConfig;
+  /**
+   * Inject a store (tests). When omitted, the store is selected from the
+   * environment: TDCP_AUTHORITY_STORE=postgres + DATABASE_URL → Postgres,
+   * otherwise the file store (local-dev fallback).
+   */
+  store?: DurableAuthorityStore;
 }
 
 export class DocumentAlreadyRegisteredError extends Error {
@@ -58,7 +65,7 @@ function sanitizeUserIds(ids: unknown): string[] {
 }
 
 export class DurableAuthorityService {
-  private readonly store: DurableJsonAuthorityStore;
+  private readonly store: DurableAuthorityStore;
   private snapshot: DurableAuthoritySnapshot;
   private oracle!: AuthorizationOracle;
   private authority!: InProcessAuthority;
@@ -74,8 +81,9 @@ export class DurableAuthorityService {
       typeof dataDirOrOptions === 'string'
         ? { dataDir: dataDirOrOptions }
         : dataDirOrOptions;
-    this.store = new DurableJsonAuthorityStore(options.dataDir);
-    this.snapshot = this.store.load();
+    this.store = options.store ?? createAuthorityStoreFromEnv(options.dataDir);
+    // Loaded from the store in initialize() (async for Postgres).
+    this.snapshot = emptyAuthoritySnapshot();
     this.signingBackend = options.signingBackend ?? readSigningBackendFromEnv();
     this.requireSubject = options.requireSubject === true;
     this.usbHsmConfig = options.usbHsm ?? loadUsbHsmConfigFromEnv();
@@ -86,13 +94,15 @@ export class DurableAuthorityService {
   }
 
   public async initialize(): Promise<void> {
+    await this.store.ensureSchema();
+    this.snapshot = await this.store.load();
     const keyStore = createAuthoritySigningKeyStore({
       backend: this.signingBackend,
       snapshot: this.snapshot,
       store: this.store,
-      onPersist: (priv, pub) => {
+      onPersist: async (priv, pub) => {
         this.snapshot = this.store.sealPrivateJwk(this.snapshot, priv, pub);
-        this.persist();
+        await this.persist();
       },
     });
 
@@ -138,7 +148,12 @@ export class DurableAuthorityService {
     this.usbHsmRegistry = new UsbHsmRegistry(
       this.usbHsmConfig,
       this.snapshot.usbHsmDevices ?? [],
-      () => this.persist()
+      () => {
+        // Fire-and-forget from a sync callback: log instead of dropping the error.
+        void this.persist().catch((err) => {
+          console.error('[tdcp-authority] failed to persist after USB-HSM change:', err);
+        });
+      }
     );
 
     this.initialized = true;
@@ -174,33 +189,40 @@ export class DurableAuthorityService {
     };
   }
 
-  private persist(): void {
+  private async persist(): Promise<void> {
     this.captureSnapshot();
-    this.store.save(this.snapshot);
+    await this.store.save(this.snapshot);
   }
 
 
   /** Readiness: durable store writable + signing key loaded. */
-  public getReadiness(): {
+  public async getReadiness(): Promise<{
     ready: boolean;
     storeWritable: boolean;
+    storeKind: DurableAuthorityStore['kind'];
     signingKeyLoaded: boolean;
     signingBackend: SigningBackendKind;
     developmentOnly: boolean;
-  } {
+  }> {
     let storeWritable = false;
     try {
-      storeWritable = this.store.probeWritable();
+      storeWritable = await this.store.probeWritable();
     } catch {
       storeWritable = false;
     }
     return {
       ready: storeWritable && this.signingKeyLoaded,
       storeWritable,
+      storeKind: this.store.kind,
       signingKeyLoaded: this.signingKeyLoaded,
       signingBackend: this.signingBackend,
       developmentOnly: this.initialized ? this.oracle.isDevelopmentKeyStore() : true,
     };
+  }
+
+  /** Which durable backend this service persists to ('file' | 'postgres'). */
+  public getStoreKind(): DurableAuthorityStore['kind'] {
+    return this.store.kind;
   }
 
   public getDataDir(): string {
@@ -228,7 +250,7 @@ export class DurableAuthorityService {
 
   public async issueChallenge(subjectUserId?: string): Promise<string> {
     const c = await this.authority.issueChallenge(subjectUserId);
-    this.persist();
+    await this.persist();
     return c;
   }
 
@@ -253,7 +275,7 @@ export class DurableAuthorityService {
       allowedUserIds: sanitizeUserIds(policy.allowedUserIds),
     };
     const secret = await this.authority.registerDocumentPolicy(clean);
-    this.persist();
+    await this.persist();
     return secret;
   }
 
@@ -279,7 +301,7 @@ export class DurableAuthorityService {
       documentId,
       sanitizeUserIds(allowedUserIds).filter((id) => id !== owner)
     );
-    this.persist();
+    await this.persist();
     return updated;
   }
 
@@ -296,31 +318,31 @@ export class DurableAuthorityService {
 
   public async processAuthorizationRequest(request: AuthorizationRequest) {
     const result = await this.authority.processAuthorizationRequest(request);
-    this.persist();
+    await this.persist();
     return result;
   }
 
   public async releaseDocumentWrapSecretForGrant(grant: AuthorizationGrant, subjectUserId?: string) {
     const secret = await this.authority.releaseDocumentWrapSecretForGrant(grant, subjectUserId);
-    this.persist();
+    await this.persist();
     return secret;
   }
 
   public async commitViewOnce(documentId: string, grantId: string, subjectUserId?: string) {
     const ok = await this.authority.commitViewOnce(documentId, grantId, subjectUserId);
-    this.persist();
+    await this.persist();
     return ok;
   }
 
   public async revokeDocument(documentId: string, reason?: string, revokedBy?: string) {
     const state = await this.authority.revokeDocument(documentId, reason, revokedBy);
-    this.persist();
+    await this.persist();
     return state;
   }
 
   public async restoreDocument(documentId: string) {
     const state = await this.authority.restoreDocument(documentId);
-    this.persist();
+    await this.persist();
     return state;
   }
 
@@ -340,8 +362,8 @@ export class DurableAuthorityService {
     return this.authority.listRevoked();
   }
 
-  /** Test helper: force flush current in-memory state to disk. */
-  public flush(): void {
-    this.persist();
+  /** Test helper: force flush current in-memory state to the store. */
+  public async flush(): Promise<void> {
+    await this.persist();
   }
 }

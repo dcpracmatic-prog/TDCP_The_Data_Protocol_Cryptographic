@@ -163,7 +163,7 @@ describe('External signing backend (P0-2)', () => {
     try {
       const svc = new DurableAuthorityService(dir);
       await svc.initialize();
-      const readiness = svc.getReadiness();
+      const readiness = await svc.getReadiness();
       assert.equal(readiness.signingBackend, 'external');
       assert.equal(readiness.ready, true);
       // Unattested fake signer: honestly NOT production-grade.
@@ -273,7 +273,7 @@ describe('External signing backend (P0-2)', () => {
     try {
       const svc = new DurableAuthorityService(join(dir, 'cmd-mode'));
       await svc.initialize();
-      assert.equal(svc.getReadiness().signingBackend, 'external');
+      assert.equal((await svc.getReadiness()).signingBackend, 'external');
       await svc.registerDocumentPolicy({
         documentId: 'DOC-EXT-3',
         packageId: 'PKG-EXT-3',

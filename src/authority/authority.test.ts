@@ -56,7 +56,7 @@ describe('DurableAuthorityService', () => {
     const revoked = await svc1.revokeDocument('DOC-REV-1', 'test revoke', 'TEST');
     assert.equal(revoked.isRevoked, true);
     assert.ok(revoked.currentEpoch >= 2);
-    svc1.flush();
+    await svc1.flush();
 
     // New service instance = "restart" against same durable store
     const svc2 = new DurableAuthorityService(dir);

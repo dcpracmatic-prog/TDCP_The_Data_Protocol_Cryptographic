@@ -19,8 +19,7 @@
  */
 
 import type { OracleKeyStore } from '../../src/oracle/oracle-key-store.ts';
-import type { DurableAuthoritySnapshot } from './durable-store.ts';
-import type { DurableJsonAuthorityStore } from './durable-store.ts';
+import type { DurableAuthoritySnapshot, DurableAuthorityStore } from './durable-store.ts';
 import { DurableFileOracleKeyStore } from './durable-key-store.ts';
 import {
   ExternalOracleKeyStore,
@@ -61,8 +60,8 @@ export function createAuthoritySigningKeyStore(options: {
     DurableAuthoritySnapshot,
     'keyId' | 'signingPrivateJwk' | 'signingPublicJwk' | 'signingPrivateJwkEnc'
   >;
-  onPersist: (privateJwk: JsonWebKey, publicJwk: JsonWebKey) => void;
-  store?: DurableJsonAuthorityStore;
+  onPersist: (privateJwk: JsonWebKey, publicJwk: JsonWebKey) => void | Promise<void>;
+  store?: DurableAuthorityStore;
 }): OracleKeyStore {
   if (options.backend === 'external') {
     // The file snapshot is ignored: the key lives in the external signer,

@@ -6,6 +6,7 @@
  * Env (core):
  *   TDCP_AUTHORITY_PORT (default 8787)
  *   TDCP_AUTHORITY_DATA_DIR (default ./data/authority)
+ *   TDCP_AUTHORITY_STORE=file|postgres (default file; postgres needs DATABASE_URL)
  *   TDCP_SIGNING_BACKEND=file (default — extractable JWK; encrypt with TDCP_AUTHORITY_KEY_PASSPHRASE)
  *   TDCP_SIGNING_BACKEND=external — delegate signing to a sidecar / local signer
  *     TDCP_SIGNING_EXTERNAL_URL=http://127.0.0.1:8011  (or TDCP_SIGNING_EXTERNAL_CMD=...)
