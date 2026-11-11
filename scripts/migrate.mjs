@@ -21,6 +21,19 @@ import { pendingMigrations } from "./migration-plan.mjs";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
+  // P0-3: en un despliegue de producción de Vercel, que falte DATABASE_URL
+  // NO puede pasar en silencio (el runtime caería a PGLite en memoria y las
+  // cuentas se perderían). Falla el build con un mensaje accionable. Local,
+  // preview y CI no ponen VERCEL_ENV=production, así que siguen igual.
+  if (process.env.VERCEL_ENV === "production") {
+    console.error(
+      "[migrate] FALTA DATABASE_URL en el despliegue de producción de Vercel: " +
+        "sin ella la app arrancaría con PGLite en memoria y las cuentas se perderían. " +
+        "En Vercel: Project Settings → Environment Variables → añade DATABASE_URL " +
+        "(Supabase → Connect → Session pooler) en Production y vuelve a desplegar.",
+    );
+    process.exit(1);
+  }
   console.log(
     "[migrate] DATABASE_URL not set — skipping (the PGLite fallback migrates itself).",
   );
