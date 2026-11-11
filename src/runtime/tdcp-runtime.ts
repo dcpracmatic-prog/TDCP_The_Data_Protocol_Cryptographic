@@ -28,6 +28,10 @@ import {
   type TDCPPackage,
 } from '../core/package/package-format.ts';
 import type { PolicyLevel, TDCPRequestedOperation } from '../core/authorization/types.ts';
+import type {
+  SmartTokenCekCustodian,
+  SmartTokenCekCustodyMode,
+} from '../protection/smart-token-cek-custody.ts';
 import { UsbHsmProver } from '../identity/usb-hsm-provider.ts';
 import type { EdgeSpec } from '../channel/policy-binding.ts';
 import { MockNFCProvider, RealNFCProvider, type NFCProvider } from '../identity/credential-provider.ts';
@@ -65,6 +69,14 @@ export interface CreatePackageRequest {
    * the sidecar answers, else legacy package without seal), `off`.
    */
   csgSeal?: 'required' | 'optional' | 'off';
+  /**
+   * Custodia Smart Token de la CEK (P2-6). `'smart-token'` exige además
+   * `smartTokenCustodian` y `smartTokenMaster` (contraseña maestra del
+   * emisor, solo para esta llamada, nunca se guarda).
+   */
+  cekCustodyMode?: SmartTokenCekCustodyMode;
+  smartTokenCustodian?: SmartTokenCekCustodian;
+  smartTokenMaster?: string;
 }
 
 export class TdcpRuntime {
@@ -145,7 +157,7 @@ export class TdcpRuntime {
       operation: 'ENCRYPT_PACKAGE',
       policy: pkg.metadata.policyLevel,
       result: 'SUCCESS',
-      details: `TDCPPackage sellado (${pkg.metadata.originalFileName}, ${pkg.metadata.originalSizeBytes} bytes). Política registrada en Oracle. Paquete ≠ autorización.`,
+      details: `TDCPPackage sellado (${pkg.metadata.originalFileName}, ${pkg.metadata.originalSizeBytes} bytes). Política registrada en Oracle. Paquete ≠ autorización.${pkg.metadata.custodyMode === 'smart-token' ? ' CEK custodiada por Smart Token.' : ''}`,
     });
 
     const blob = await serializeTDCPPackage(pkg);
@@ -164,6 +176,9 @@ export class TdcpRuntime {
     pkg: TDCPPackage;
     password: string;
     requestedOperation: TDCPRequestedOperation;
+    /** Custodia Smart Token (P2-6): custodio y master, solo por operación. */
+    smartTokenCustodian?: SmartTokenCekCustodian;
+    smartTokenMaster?: string;
   }): Promise<GatekeeperUnlockResult> {
     return DCPGatekeeper.executeUnlock({
       packageData: options.pkg,
@@ -175,6 +190,8 @@ export class TdcpRuntime {
       authority: this.authority,
       oracle: this.oracle,
       auditSink: this.auditSink,
+      smartTokenCustodian: options.smartTokenCustodian,
+      smartTokenMaster: options.smartTokenMaster,
     });
   }
 

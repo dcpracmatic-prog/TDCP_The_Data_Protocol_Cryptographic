@@ -39,6 +39,12 @@ export interface TDCPPackageMetadata {
   kdfIterations: number;
   documentId: string;
   packageId: string;
+  /**
+   * Custodia de la CEK. `'oracle'` (default, sin cambios) o
+   * `'smart-token'` (P2-6: la CEK vive custodiada por Smart Token y el
+   * paquete no contiene CEK envuelta por el Oracle).
+   */
+  custodyMode?: 'oracle' | 'smart-token';
 }
 
 export interface TDCPPackage {
@@ -73,6 +79,13 @@ export interface TDCPPackage {
    * it would be circular.
    */
   csgSeal?: CsgSealDocument;
+  /**
+   * Present only when metadata.custodyMode === 'smart-token' (P2-6).
+   * Referencia opaca al artefacto Smart Token que custodia la CEK.
+   * En este modo NO hay wrappedKeyBase64/ivKeyBase64: el paquete no
+   * contiene ninguna copia de la CEK envuelta por el Oracle.
+   */
+  smartTokenCustody?: { artifactId: string; version: 1 };
 }
 
 /**
@@ -191,11 +204,40 @@ export async function deserializeTDCPPackage(data: ArrayBuffer | string): Promis
       };
     }
 
-    if (!parsed.wrappedKeyBase64 || !parsed.ivKeyBase64) {
-      return {
-        isValidEnvelope: false,
-        error: 'El paquete no contiene CEK envuelto. Formato antiguo o incompleto.',
-      };
+    const isSmartTokenCustody = parsed.metadata?.custodyMode === 'smart-token';
+    if (isSmartTokenCustody) {
+      // P2-6: en custodia Smart Token el paquete NO debe contener ninguna
+      // CEK envuelta por el Oracle (una segunda copia anularía la custodia).
+      if (parsed.wrappedKeyBase64 || parsed.ivKeyBase64) {
+        return {
+          isValidEnvelope: false,
+          error: 'Paquete smart-token-custody con CEK envuelta por el Oracle. Formato no autorizado.',
+        };
+      }
+      if (
+        !parsed.smartTokenCustody ||
+        parsed.smartTokenCustody.version !== 1 ||
+        typeof parsed.smartTokenCustody.artifactId !== 'string' ||
+        !parsed.smartTokenCustody.artifactId
+      ) {
+        return {
+          isValidEnvelope: false,
+          error: 'Paquete smart-token-custody sin referencia de custodia Smart Token válida.',
+        };
+      }
+    } else {
+      if (parsed.smartTokenCustody) {
+        return {
+          isValidEnvelope: false,
+          error: 'Paquete con referencia de custodia Smart Token pero sin modo smart-token.',
+        };
+      }
+      if (!parsed.wrappedKeyBase64 || !parsed.ivKeyBase64) {
+        return {
+          isValidEnvelope: false,
+          error: 'El paquete no contiene CEK envuelto. Formato antiguo o incompleto.',
+        };
+      }
     }
 
     if (parsed.metadata?.policyLevel === 'ULTRA_CRITICAL' && !parsed.ultraCritical) {
@@ -234,8 +276,11 @@ export async function deserializeTDCPPackage(data: ArrayBuffer | string): Promis
       // Optimization: calculate decoded byte length with zero buffer allocations via base64ToByteLength
       const ivLength = base64ToByteLength(parsed.ivBase64);
       const saltLength = base64ToByteLength(parsed.saltBase64);
-      const keyIvLength = base64ToByteLength(parsed.ivKeyBase64);
-      if (ivLength !== 12 || keyIvLength !== 12 || saltLength < 16) {
+      const keyIvLength = parsed.ivKeyBase64 ? base64ToByteLength(parsed.ivKeyBase64) : 0;
+      if (ivLength !== 12 || saltLength < 16) {
+        return { isValidEnvelope: false, error: 'Longitudes criptográficas inválidas (IV/salt).' };
+      }
+      if (!isSmartTokenCustody && keyIvLength !== 12) {
         return { isValidEnvelope: false, error: 'Longitudes criptográficas inválidas (IV/salt).' };
       }
     } catch {
@@ -280,6 +325,9 @@ export function canonicalPackageEnvelopeString(pkg: TDCPPackage): string {
     ivKeyBase64: pkg.ivKeyBase64 ?? '',
     envelopeEpoch: pkg.envelopeEpoch,
     ultraCritical: pkg.ultraCritical ?? null,
+    // Solo cuando está presente: los paquetes oracle existentes mantienen
+    // su hash intacto; la referencia de custodia queda ligada al sobre.
+    ...(pkg.smartTokenCustody ? { smartTokenCustody: pkg.smartTokenCustody } : {}),
   });
 }
 

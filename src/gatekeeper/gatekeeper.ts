@@ -43,6 +43,11 @@ import { verifyABCInterlockingIntegrity } from '../core/package/ultra-critical.t
 import { verifyPolicyBinding, type PolicyBinding } from '../channel/policy-binding.ts';
 import { createCsgOperationSeal, type CsgSealDocument } from '../protection/csg-seal.ts';
 import { verifyPackageSeal, type CsgPackageSealStatus } from '../core/package/csg-package-seal.ts';
+import type { SmartTokenCekCustodian } from '../protection/smart-token-cek-custody.ts';
+import {
+  smartTokenCekCustodianFromEnv,
+  wipeCek,
+} from '../protection/smart-token-cek-custody.ts';
 
 export interface GatekeeperUnlockOptions {
   packageData: TDCPPackage;
@@ -65,6 +70,20 @@ export interface GatekeeperUnlockOptions {
    */
   usbHsmProver?: UsbHsmProverFn;
   customChallenge?: string;
+  /**
+   * Custodia Smart Token (P2-6). Custodio explícito (adaptador HTTP real
+   * o doble de tests). Si se omite, se resuelve desde el entorno
+   * (SMART_TOKEN_API_URL / SMART_TOKEN_API_KEY); sin configuración la
+   * apertura de un paquete en custodia FALLA CERRADA, nunca usa el wrap
+   * del Oracle como fallback.
+   */
+  smartTokenCustodian?: SmartTokenCekCustodian;
+  /**
+   * Contraseña maestra del emisor para liberar la CEK en Smart Token.
+   * Obligatoria para paquetes con custodyMode 'smart-token'. Solo vive
+   * en esta llamada; TDCP no la guarda. En modo oracle no se usa.
+   */
+  smartTokenMaster?: string;
 }
 
 export interface GatekeeperUnlockResult {
@@ -502,6 +521,103 @@ export class DCPGatekeeper {
     // Optimization: fast Base64 decoding directly to Uint8Array (~3.7x faster than base64ToArrayBuffer + new Uint8Array)
     const salt = base64ToUint8Array(packageData.saltBase64);
 
+    // ── P2-6: custodia Smart Token de la CEK ─────────────────────────────
+    // El grant ya se validó y consumió de un solo uso arriba (igual que en
+    // modo oracle: un intento fallido — master incorrecto, servicio caído —
+    // consume el grant de ese intento; la siguiente apertura pide un grant
+    // nuevo). A partir de aquí NUNCA hay fallback al wrap del Oracle.
+    const isSmartTokenCustody =
+      packageData.metadata?.custodyMode === 'smart-token' || Boolean(packageData.smartTokenCustody);
+    if (isSmartTokenCustody) {
+      const denyCustody = async (
+        errorCode: string,
+        errorMessage: string
+      ): Promise<GatekeeperUnlockResult> => {
+        await auditSink.recordEvent({
+          documentId: packageData.documentId,
+          packageId: packageData.packageId,
+          deviceId: device.deviceId,
+          credentialId: credential.credentialId,
+          operationId,
+          authorizationId: grant.grantId,
+          operation: requestedOperation,
+          policy: grant.policyLevel,
+          result: 'DENIED',
+          details: `Custodia Smart Token: ${errorMessage}`,
+        });
+        return { success: false, errorCode, errorMessage };
+      };
+
+      const custodian =
+        options.smartTokenCustodian ?? smartTokenCekCustodianFromEnv();
+      if (!custodian) {
+        wipeBuffer(wrapSecret);
+        return await denyCustody(
+          'SMART_TOKEN_CUSTODY_NOT_CONFIGURED',
+          'Smart Token no configurado (SMART_TOKEN_API_URL / SMART_TOKEN_API_KEY). Apertura en custodia denegada.'
+        );
+      }
+      if (!options.smartTokenMaster) {
+        wipeBuffer(wrapSecret);
+        return await denyCustody(
+          'SMART_TOKEN_MASTER_REQUIRED',
+          'Falta la contraseña maestra del emisor para liberar la CEK en Smart Token.'
+        );
+      }
+      const artifactId = packageData.smartTokenCustody?.artifactId;
+      if (!artifactId) {
+        wipeBuffer(wrapSecret);
+        return await denyCustody(
+          'SMART_TOKEN_CEK_INVALID',
+          'El paquete en custodia no trae referencia de artefacto Smart Token.'
+        );
+      }
+      // El secreto de wrap del Oracle no se usa en este modo: se borra ya.
+      wipeBuffer(wrapSecret);
+
+      let release: Awaited<ReturnType<SmartTokenCekCustodian['openCek']>>;
+      try {
+        release = await custodian.openCek(artifactId, options.smartTokenMaster);
+      } catch (err: unknown) {
+        return await denyCustody(
+          'SMART_TOKEN_UNAVAILABLE',
+          `Servicio Smart Token no disponible: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+      if (!release.ok) {
+        // DENIED opaco: no se distingue master incorrecto de artefacto
+        // desconocido, igual que el 403 del servicio real.
+        return await denyCustody(
+          'SMART_TOKEN_DENIED',
+          'Smart Token denegó la liberación de la CEK.'
+        );
+      }
+      if (release.cek.byteLength !== 32) {
+        wipeCek(release.cek);
+        return await denyCustody(
+          'SMART_TOKEN_CEK_INVALID',
+          'Smart Token liberó una CEK de longitud inválida.'
+        );
+      }
+      try {
+        // slice(): copia con buffer ArrayBuffer propio (lo exige importKey).
+        contentDecryptionKey = await crypto.subtle.importKey(
+          'raw',
+          release.cek.slice(),
+          { name: 'AES-GCM' },
+          false,
+          ['decrypt']
+        );
+      } catch (err: unknown) {
+        wipeCek(release.cek);
+        return await denyCustody(
+          'SMART_TOKEN_CEK_INVALID',
+          `La CEK liberada no es válida: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+      // La CEK en claro solo vive en memoria hasta importarla como clave.
+      wipeCek(release.cek);
+    } else {
     try {
       const rootKeyMaterial = await deriveRootKeyFromSecret(
         userPassword,
@@ -546,6 +662,7 @@ export class DCPGatekeeper {
         errorMessage: `Error al desenvolver CEK: ${err instanceof Error ? err.message : String(err)}`,
       };
     }
+    } // fin modo oracle (wrap del Oracle)
 
     let decryptedBuffer: ArrayBuffer;
     try {
