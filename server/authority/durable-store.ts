@@ -46,6 +46,53 @@ export interface DurableAuthoritySnapshot {
   usbHsmDevices: UsbHsmDeviceRecord[];
 }
 
+/**
+ * Common store interface (P0-1). The file store and the Postgres store
+ * implement EXACTLY these methods over the same snapshot shape, so the
+ * Authority service cannot tell which backend it is talking to.
+ *
+ * load/save/probeWritable are async because Postgres I/O is async; the file
+ * store keeps its synchronous body underneath and only wraps the result.
+ * resolvePrivateJwk / sealPrivateJwk stay synchronous: they are pure crypto
+ * over the snapshot, with no I/O.
+ */
+export interface DurableAuthorityStore {
+  readonly kind: AuthorityStoreKind;
+  readonly dataDir: string;
+  load(): Promise<DurableAuthoritySnapshot>;
+  save(snapshot: DurableAuthoritySnapshot): Promise<void>;
+  resolvePrivateJwk(snapshot: DurableAuthoritySnapshot): JsonWebKey | null;
+  sealPrivateJwk(
+    snapshot: DurableAuthoritySnapshot,
+    privateJwk: JsonWebKey,
+    publicJwk: JsonWebKey
+  ): DurableAuthoritySnapshot;
+  probeWritable(): Promise<boolean>;
+  /** Create the backend schema if missing (no-op for the file store). */
+  ensureSchema(): Promise<void>;
+  /** Release backend resources (no-op for the file store). */
+  close(): Promise<void>;
+}
+
+export type AuthorityStoreKind = 'file' | 'postgres';
+
+/** TDCP_AUTHORITY_STORE=file (default, local dev) | postgres (DATABASE_URL required). */
+export function readAuthorityStoreKindFromEnv(
+  env: Record<string, string | undefined> = process.env as Record<string, string | undefined>
+): AuthorityStoreKind {
+  const raw = (env.TDCP_AUTHORITY_STORE || '').trim().toLowerCase();
+  if (raw === '' || raw === 'file') return 'file';
+  if (raw === 'postgres') return 'postgres';
+  throw new Error(
+    `TDCP_AUTHORITY_STORE inválido: "${raw}" (usa "file" o "postgres")`
+  );
+}
+
+/** Fresh empty snapshot (same defaults the file store used for a missing file). */
+export function emptyAuthoritySnapshot(): DurableAuthoritySnapshot {
+  return structuredClone(EMPTY);
+}
+
 const EMPTY: DurableAuthoritySnapshot = {
   version: 1,
   keyId: 'AUTHORITY-KEY-P256-DURABLE-DEV',
@@ -62,10 +109,70 @@ const EMPTY: DurableAuthoritySnapshot = {
   usbHsmDevices: [],
 };
 
-/** Caps to avoid unbounded JSON growth on disk (I/O overflow). */
+/**
+ * Shared key-seal logic (no I/O): both stores resolve/seal the private JWK
+ * identically. Encrypted blob wins when present; plaintext is dev-only.
+ */
+export function resolveSnapshotPrivateJwk(
+  snapshot: DurableAuthoritySnapshot
+): JsonWebKey | null {
+  const passphrase = readAuthorityKeyPassphrase();
+  if (snapshot.signingPrivateJwkEnc && isEncryptedPrivateKeyBlob(snapshot.signingPrivateJwkEnc)) {
+    if (!passphrase) {
+      throw new Error(
+        'TDCP_AUTHORITY_KEY_PASSPHRASE (or TDCP_AUTHORITY_KEY_FILE) required to decrypt signing key'
+      );
+    }
+    return decryptPrivateJwk(snapshot.signingPrivateJwkEnc, passphrase);
+  }
+  return snapshot.signingPrivateJwk;
+}
+
+export function sealSnapshotPrivateJwk(
+  snapshot: DurableAuthoritySnapshot,
+  privateJwk: JsonWebKey,
+  publicJwk: JsonWebKey
+): DurableAuthoritySnapshot {
+  const passphrase = readAuthorityKeyPassphrase();
+  if (passphrase) {
+    return {
+      ...snapshot,
+      signingPrivateJwk: null,
+      signingPrivateJwkEnc: encryptPrivateJwk(privateJwk, passphrase),
+      signingPublicJwk: publicJwk,
+    };
+  }
+  if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
+    console.warn(
+      '[tdcp-authority] Signing private JWK stored in plaintext. Set TDCP_AUTHORITY_KEY_PASSPHRASE to encrypt at rest.'
+    );
+  }
+  return {
+    ...snapshot,
+    signingPrivateJwk: privateJwk,
+    signingPrivateJwkEnc: null,
+    signingPublicJwk: publicJwk,
+  };
+}
 const MAX_PERSIST_CONSUMED = 20_000;
 const MAX_PERSIST_CHALLENGES = 5_000;
 const MAX_PERSIST_GRANTS = 20_000;
+
+/**
+ * Apply the persistence caps (keep only the most recent rows). Shared by the
+ * file store and the Postgres store so both backends bound growth identically.
+ */
+export function capSnapshotForPersist(
+  snapshot: DurableAuthoritySnapshot
+): DurableAuthoritySnapshot {
+  return {
+    ...snapshot,
+    consumedOperations: snapshot.consumedOperations.slice(-MAX_PERSIST_CONSUMED),
+    consumedGrantIds: snapshot.consumedGrantIds.slice(-MAX_PERSIST_GRANTS),
+    activeChallenges: snapshot.activeChallenges.slice(-MAX_PERSIST_CHALLENGES),
+    challengeSubjects: snapshot.challengeSubjects.slice(-MAX_PERSIST_CHALLENGES),
+  };
+}
 
 function atomicWriteJson(path: string, data: unknown): void {
   const tmp = `${path}.tmp`;
@@ -73,7 +180,8 @@ function atomicWriteJson(path: string, data: unknown): void {
   renameSync(tmp, path);
 }
 
-export class DurableJsonAuthorityStore {
+export class DurableJsonAuthorityStore implements DurableAuthorityStore {
+  public readonly kind: AuthorityStoreKind = 'file';
   public readonly dataDir: string;
   private readonly snapshotPath: string;
 
@@ -83,7 +191,7 @@ export class DurableJsonAuthorityStore {
     mkdirSync(dataDir, { recursive: true });
   }
 
-  public load(): DurableAuthoritySnapshot {
+  public async load(): Promise<DurableAuthoritySnapshot> {
     if (!existsSync(this.snapshotPath)) {
       return structuredClone(EMPTY);
     }
@@ -111,29 +219,19 @@ export class DurableJsonAuthorityStore {
     }
   }
 
-  public save(snapshot: DurableAuthoritySnapshot): void {
-    const capped: DurableAuthoritySnapshot = {
-      ...snapshot,
-      consumedOperations: snapshot.consumedOperations.slice(-MAX_PERSIST_CONSUMED),
-      consumedGrantIds: snapshot.consumedGrantIds.slice(-MAX_PERSIST_GRANTS),
-      activeChallenges: snapshot.activeChallenges.slice(-MAX_PERSIST_CHALLENGES),
-      challengeSubjects: snapshot.challengeSubjects.slice(-MAX_PERSIST_CHALLENGES),
-    };
-    atomicWriteJson(this.snapshotPath, capped);
+  public async save(snapshot: DurableAuthoritySnapshot): Promise<void> {
+    atomicWriteJson(this.snapshotPath, capSnapshotForPersist(snapshot));
   }
+
+  /** No schema to create for the file store. */
+  public async ensureSchema(): Promise<void> {}
+
+  /** Nothing to release for the file store. */
+  public async close(): Promise<void> {}
 
   /** Resolve private JWK from encrypted blob or legacy plaintext. */
   public resolvePrivateJwk(snapshot: DurableAuthoritySnapshot): JsonWebKey | null {
-    const passphrase = readAuthorityKeyPassphrase();
-    if (snapshot.signingPrivateJwkEnc && isEncryptedPrivateKeyBlob(snapshot.signingPrivateJwkEnc)) {
-      if (!passphrase) {
-        throw new Error(
-          'TDCP_AUTHORITY_KEY_PASSPHRASE (or TDCP_AUTHORITY_KEY_FILE) required to decrypt signing key'
-        );
-      }
-      return decryptPrivateJwk(snapshot.signingPrivateJwkEnc, passphrase);
-    }
-    return snapshot.signingPrivateJwk;
+    return resolveSnapshotPrivateJwk(snapshot);
   }
 
   /**
@@ -144,30 +242,11 @@ export class DurableJsonAuthorityStore {
     privateJwk: JsonWebKey,
     publicJwk: JsonWebKey
   ): DurableAuthoritySnapshot {
-    const passphrase = readAuthorityKeyPassphrase();
-    if (passphrase) {
-      return {
-        ...snapshot,
-        signingPrivateJwk: null,
-        signingPrivateJwkEnc: encryptPrivateJwk(privateJwk, passphrase),
-        signingPublicJwk: publicJwk,
-      };
-    }
-    if (typeof process !== 'undefined' && process.env.NODE_ENV !== 'test') {
-      console.warn(
-        '[tdcp-authority] Signing private JWK stored in plaintext. Set TDCP_AUTHORITY_KEY_PASSPHRASE to encrypt at rest.'
-      );
-    }
-    return {
-      ...snapshot,
-      signingPrivateJwk: privateJwk,
-      signingPrivateJwkEnc: null,
-      signingPublicJwk: publicJwk,
-    };
+    return sealSnapshotPrivateJwk(snapshot, privateJwk, publicJwk);
   }
 
   /** Write a tiny probe file to verify the data dir is writable. */
-  public probeWritable(): boolean {
+  public async probeWritable(): Promise<boolean> {
     const probe = join(this.dataDir, '.write-probe');
     writeFileSync(probe, String(Date.now()), { mode: 0o600 });
     return existsSync(probe);

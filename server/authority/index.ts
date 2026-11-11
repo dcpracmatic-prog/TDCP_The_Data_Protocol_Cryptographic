@@ -6,6 +6,7 @@
  * Env (core):
  *   TDCP_AUTHORITY_PORT (default 8787)
  *   TDCP_AUTHORITY_DATA_DIR (default ./data/authority)
+ *   TDCP_AUTHORITY_STORE=file|postgres (default file; postgres needs DATABASE_URL)
  *   TDCP_SIGNING_BACKEND=file (default — extractable JWK; encrypt with TDCP_AUTHORITY_KEY_PASSPHRASE)
  *   TDCP_AUTHORITY_KEY_PASSPHRASE / TDCP_AUTHORITY_KEY_FILE — AES-GCM at rest for private JWK
  *   TDCP_AUTHORITY_RATE_MODE=memory|file  TDCP_TRUST_PROXY=0|1

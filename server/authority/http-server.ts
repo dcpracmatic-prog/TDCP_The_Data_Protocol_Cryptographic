@@ -184,6 +184,7 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
       usbHsm: options.usbHsm,
     });
   await service.initialize();
+  console.log(`[tdcp-authority] durable store: ${service.getStoreKind()}`);
   if (userAuth.mode === 'required' && !service.isSubjectRequired()) {
     throw new Error('TDCP_USER_AUTH=required but the injected service does not require a subject');
   }
@@ -285,7 +286,7 @@ export async function startAuthorityHttpServer(options: AuthorityHttpServerOptio
       }
 
       if (method === 'GET' && (path === '/ready' || path === '/readyz')) {
-        const readiness = service.getReadiness();
+        const readiness = await service.getReadiness();
         const status = readiness.ready ? 200 : 503;
         sendJson(
           res,

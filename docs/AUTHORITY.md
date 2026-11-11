@@ -49,6 +49,57 @@ Persisted under `data/authority/` (gitignored), default file `authority-state.js
 - Active challenges (TTL still enforced in memory logic)
 - Development signing JWK pair (honest: not HSM)
 
+## Durable state (Postgres, P0-1)
+
+The same Authority state can live in Postgres instead of the JSON file.
+Nothing about security changes — Gatekeeper is still the only unlock path,
+grants are still single-use, revocation still works by epochs, challenges
+are still anti-replay, view-once is still enforced by the Authority. Only
+WHERE the state lives changes (durable rows instead of one file).
+
+| Setting | Behavior |
+|---------|----------|
+| `TDCP_AUTHORITY_STORE=file` (default) | JSON file under `data/authority/` — local dev fallback |
+| `TDCP_AUTHORITY_STORE=postgres` + `DATABASE_URL` | Postgres store (`server/authority/postgres-store.ts`) |
+| `TDCP_AUTHORITY_STORE=postgres` without `DATABASE_URL` | Fails loudly at startup — never silently falls back to the file |
+| Any other value | Fails loudly at startup |
+
+Schema: `migrations/0005_authority_store.sql` — one row per policy, wrap
+secret, revocation state, consumed operation, consumed grant, active
+challenge, challenge subject, and USB-HSM device, plus a singleton
+`authority_meta` row for the key id + signing key material. Primary keys
+make single-use grants and consumed operations collide instead of
+duplicating at the storage layer too. `save()` replaces the whole snapshot
+inside ONE transaction (same whole-snapshot semantics as the atomic JSON
+rewrite of the file store), and the same caps apply (last 20,000 consumed
+operations / grants, last 5,000 challenges).
+
+The migration applies automatically: `scripts/migrate.mjs` on deploy
+(recorded in `_migrations`), the PGLite fallback in `src/lib/db.ts` on
+startup, and the Postgres store itself at Authority startup
+(`ensureSchema()`, idempotent — every statement is `IF NOT EXISTS`).
+Row Level Security is enabled with NO policies on the Authority tables
+(same convention as the account tables): the Supabase Data API sees
+nothing, while the server connection (table owner) is unaffected.
+
+Signing key at rest follows the file store exactly: plaintext only in dev,
+AES-256-GCM encrypted blob when `TDCP_AUTHORITY_KEY_PASSPHRASE` is set.
+Still NOT HSM-grade.
+
+```bash
+export TDCP_AUTHORITY_STORE=postgres
+export DATABASE_URL="postgresql://tdcp_app:<password>@aws-0-us-west-2.pooler.supabase.com:5432/postgres"
+npm run db:migrate   # applies migrations/0005_authority_store.sql
+npm run authority    # logs: [tdcp-authority] durable store: postgres
+```
+
+Tests: `src/authority/postgres-store.test.ts` runs the store against an
+embedded PGLite instance (same SQL) and replays the file-store flows
+(grant once, replay rejected, revoke survives restart) through
+`DurableAuthorityService` over Postgres. The sandbox blocks direct
+Postgres connections on port 5432, so the live Supabase database is
+verified through the Management API instead — see `docs/OPS.md`.
+
 ## HTTP API sketch
 
 Base URL: `TDCP_AUTHORITY_URL` (e.g. `http://127.0.0.1:8787`)
