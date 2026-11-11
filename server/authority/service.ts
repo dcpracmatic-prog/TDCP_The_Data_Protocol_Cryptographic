@@ -149,9 +149,10 @@ export class DurableAuthorityService {
       this.usbHsmConfig,
       this.snapshot.usbHsmDevices ?? [],
       () => {
-        // Fire-and-forget from a sync callback: log instead of dropping the error.
-        void this.persist().catch((err) => {
-          console.error('[tdcp-authority] failed to persist after USB-HSM change:', err);
+        // Fire-and-forget from a sync callback: log a static message only
+        // (never the error object — it can carry sensitive details).
+        void this.persist().catch(() => {
+          console.error('[tdcp-authority] failed to persist after USB-HSM change');
         });
       }
     );
