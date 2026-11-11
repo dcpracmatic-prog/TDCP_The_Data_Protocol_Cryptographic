@@ -106,6 +106,31 @@ Do **not** change crypto primitives or Gatekeeper security semantics under these
 **Remaining:** Formal threat-model cross-reference.
 **P2-5 (2026-11-11, DONE):** CSG seal wired into the `.pkg` itself — seal at protect (stored in `csgSeal`, covers the canonical envelope: structure + full content), verify in the Gatekeeper before decrypt/grant with fail-closed `CSG_PACKAGE_SEAL_FAILED`, legacy seal-less packages still open (no CSG guarantee), unit + Gatekeeper tests (`src/core/package/csg-package-seal.test.ts`, 13 tests) and real-sidecar smoke (`npm run smoke:csg-pkg`). See `docs/CSG_SMART_TOKEN_BRIDGE.md` § P2-5.
 
+## P0-1 — Store durable de la Authority en Postgres — **DONE**
+
+**Goal:** El estado durable de la Authority (políticas, wrap secrets,
+revocación, anti-replay, challenges) vive en Postgres en vez de un JSON de
+un solo nodo, sin cambiar la semántica de seguridad.
+
+- [x] `TDCP_AUTHORITY_STORE=postgres|file` (`server/authority/postgres-store.ts`); `postgres` sin `DATABASE_URL` falla al arrancar, nunca cae en silencio al archivo
+- [x] Migración `migrations/0005_authority_store.sql`: 9 tablas `authority_*`, RLS sin políticas (la Data API de Supabase no lee nada); claves primarias que hacen colisionar el re-uso
+- [x] `/ready` incluye `storeKind`; `save()` en una transacción (misma semántica de snapshot completo que el archivo)
+- [x] Tests contra PGLite embebido (mismo SQL); Supabase real verificado vía API de Management
+
+**Exit criteria:** `npm test` + `npm run typecheck` green; sin cambio de semántica Gatekeeper.  
+**Remaining:** HA, backups cifrados, SLOs; el despliegue de Vercel aún no usa Supabase en Production (redeploy pendiente).
+
+## P0-3 — Guardia fail-fast de producción sin DATABASE_URL — **DONE**
+
+**Goal:** Que producción nunca vuelva a caer en silencio a PGLite (cuentas
+que se pierden al reciclar el despliegue).
+
+- [x] En producción (`VERCEL_ENV=production`, o `NODE_ENV=production` con `VERCEL=1`) la app falla al arrancar sin `DATABASE_URL`; dev/local/preview siguen usando PGLite
+- [x] `GET /api/db-status` dice qué base sirve (`postgres` / `pglite`), `production` y `ready`, sin secretos
+
+**Exit criteria:** `npm test` + `npm run typecheck` green; `npm run preview` local sigue funcionando.  
+**Remaining:** el redeploy de Vercel con las variables en Production (pendiente de Arturo); tras él, `/api/db-status` debe decir `postgres, ready: true`.
+
 ## P0-2 — External signing backend (KMS/HSM sidecar) — **DONE**
 
 **Goal:** The Authority can sign grants with a real KMS/HSM without the key
@@ -134,6 +159,19 @@ ever entering its process, and without an AWS SDK dependency in the repo.
 
 **Exit criteria:** Roundtrip proteger/abrir con custodia y denegación sin grant / con servicio caído, todo verificado en tests.  
 **Remaining:** Smoke contra el servicio Smart Token REAL (requiere `api/` levantado; el contrato es el mismo ya verificado por el puente en 2026-11-11). Sin pruebas formales (deferred, como el resto del repo).
+
+## P0-4 — Paquete de revisión de seguridad independiente — **DONE (preparación)**
+
+**Goal:** Dejar lista la carpeta que se entrega a un auditor externo, con la
+arquitectura final documentada con honestidad. Esto PREPARA la auditoría; no
+la sustituye. Un auditor humano externo sigue siendo necesario.
+
+- [x] `docs/THREAT_MODEL.md` nuevo: activos, modelo de atacante, fronteras de confianza, amenazas por componente (P0-1, P0-2, P0-3, P2-5, P2-6, cuentas/admin), fuera de alcance y 7 supuestos a verificar o romper
+- [x] `docs/SECURITY_REVIEW_PACK.md` actualizado a la arquitectura final: alcance dentro/fuera, qué NO se afirma, estado honesto del despliegue (Vercel aún sin Supabase en Production, redeploy pendiente), evidencia de tests medida y alcance concreto para el auditor (archivo por archivo, artefactos, criterios de aceptación)
+- [x] ROADMAP con las secciones P0-1 y P0-3 que faltaban
+
+**Exit criteria:** `npm test` (192 tests) + `npm run typecheck` green; CI verde en el PR; sin cambios de código de seguridad ni de primitivas cripto.  
+**Remaining:** asignar el auditor externo y verificar en vivo `/api/db-status` tras el redeploy; registrar hallazgos en `LAUNCH.md`.
 
 ## Explicitly deferred
 
