@@ -36,6 +36,25 @@ TDCP gestiona las cuentas en el servidor con Better Auth (email y contraseña) s
 4. Crea las tablas con `npm run db:migrate`. El comando es idempotente: registra lo aplicado en `_migrations`.
 5. Arranca la app con `npm run dev` y abre http://localhost:8080. Ya puedes usar Crear cuenta, Iniciar sesión y Recuperar.
 
+## Despliegue en Vercel (producción)
+
+> El 11 nov 2026 el despliegue funcionaba con login y Supabase seguía con 0
+> usuarios: servía PGLite en memoria porque las variables no habían tomado
+> efecto en Production. Desde la P0-3, en producción la app **no arranca sin
+> `DATABASE_URL`** (falla al arrancar con un error claro) y el log dice qué
+> backend está activo. Pasos exactos en `DEPLOY.md` → "Vercel — despliegue de
+> producción": pega `DATABASE_URL`, `BETTER_AUTH_SECRET`,
+> `BETTER_AUTH_URL=https://tdcp.vercel.app` y `VITE_AUTH_ENABLED=true` en
+> **Production** y haz **Redeploy**. Después verifica:
+>
+> 1. El log de arranque dice `[db] backend=postgres`.
+> 2. `https://tdcp.vercel.app/api/db-status` devuelve
+>    `{"backend":"postgres","databaseConfigured":true,"production":true,"ready":true}`.
+> 3. Al crear una cuenta aparece **1 usuario** en la tabla `user` de Supabase.
+>
+> En desarrollo, local o preview sin `DATABASE_URL` la app sigue usando PGLite
+> y nada de esto aplica.
+
 ## Seguridad
 
 - **RLS activado:** `0003_enable_rls.sql` activa Row Level Security sin políticas en todas las tablas. Así, la Data API de Supabase (`anon`/`authenticated`) no puede leer hashes, sesiones ni carpetas, mientras que el servidor, que conecta como `postgres`, funciona igual. No desactives RLS ni crees políticas para `anon` en estas tablas.
