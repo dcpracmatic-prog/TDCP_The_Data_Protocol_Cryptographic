@@ -100,6 +100,14 @@ export class AuthorizationOracle {
   }
 
   public async initialize(): Promise<void> {
+    if (typeof this.keyStore.signCanonical === 'function') {
+      // Non-exportable key (KMS/HSM/external signer): there is no private
+      // CryptoKey in this process, so getOrCreateSigningKey() must throw.
+      // Just prove the public half is reachable; signing goes through
+      // signCanonical() at grant time.
+      await this.keyStore.getPublicKey();
+      return;
+    }
     await this.keyStore.getOrCreateSigningKey();
   }
 

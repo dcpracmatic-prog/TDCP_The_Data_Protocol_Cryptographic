@@ -20,7 +20,7 @@ This document is the honesty contract for the **operational MVP** shipped via `.
 
 | Item | Notes |
 |------|-------|
-| Real HSM / cloud KMS signing | `TDCP_SIGNING_BACKEND=file` (default) or `kms-stub` only |
+| Real HSM / cloud KMS signing | `TDCP_SIGNING_BACKEND=external` + KMS sidecar example shipped (P0-2); a real key deployment by the operator is still pending |
 | Multi-tenant isolation / billing | Out of scope for this wedge |
 | Production IdP / SSO for the demo UI | Local demo session + optional localStorage accounts |
 | Firebase / Gemini control plane | Explicitly excluded |

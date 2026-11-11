@@ -7,6 +7,10 @@
  *   TDCP_AUTHORITY_PORT (default 8787)
  *   TDCP_AUTHORITY_DATA_DIR (default ./data/authority)
  *   TDCP_SIGNING_BACKEND=file (default — extractable JWK; encrypt with TDCP_AUTHORITY_KEY_PASSPHRASE)
+ *   TDCP_SIGNING_BACKEND=external — delegate signing to a sidecar / local signer
+ *     TDCP_SIGNING_EXTERNAL_URL=http://127.0.0.1:8011  (or TDCP_SIGNING_EXTERNAL_CMD=...)
+ *     TDCP_SIGNING_EXTERNAL_ATTESTED=true only when the signer is a real KMS/HSM
+ *     See docs/AUTHORITY.md ("Firma externa (KMS/HSM)").
  *   TDCP_AUTHORITY_KEY_PASSPHRASE / TDCP_AUTHORITY_KEY_FILE — AES-GCM at rest for private JWK
  *   TDCP_AUTHORITY_RATE_MODE=memory|file  TDCP_TRUST_PROXY=0|1
  *
@@ -56,5 +60,7 @@ if (tlsEnabled) {
   console.log('[tdcp-authority] TLS enabled' + (adminAuthMode.includes('mtls') ? ' (mTLS client certs required for admin)' : ''));
 }
 console.log(
-  '[tdcp-authority] WARNING: file JWK signing is NOT HSM-grade. Set TDCP_AUTHORITY_KEY_PASSPHRASE to encrypt private key at rest. See docs/AUTHORITY.md'
+  backend === 'file'
+    ? '[tdcp-authority] WARNING: file JWK signing is NOT HSM-grade. Set TDCP_AUTHORITY_KEY_PASSPHRASE to encrypt private key at rest. See docs/AUTHORITY.md'
+    : '[tdcp-authority] external signing: the key never enters this process; if the signer is down, grants fail closed. See docs/AUTHORITY.md'
 );
