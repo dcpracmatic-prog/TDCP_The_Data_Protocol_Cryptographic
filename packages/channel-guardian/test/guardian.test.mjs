@@ -115,13 +115,19 @@ describe("ChannelGuardian", () => {
 
 describe("Canonicalization", () => {
   it("is order-independent for edges", () => {
+    // Fixed expiry: makePolicy() defaults to Date.now() + 120s, so two calls
+    // made across a millisecond boundary would differ by 1 ms and fail the
+    // strict comparison for a clock reason, not an ordering reason (flaky in CI).
+    const expiry = 1794409615000;
     const a = makePolicy({
+      expiry,
       edges: [
         { source: "B", destination: "C", expectedBytes: 10, allowed: true },
         { source: "A", destination: "B", expectedBytes: 10, allowed: true },
       ],
     });
     const b = makePolicy({
+      expiry,
       edges: [
         { source: "A", destination: "B", expectedBytes: 10, allowed: true },
         { source: "B", destination: "C", expectedBytes: 10, allowed: true },
