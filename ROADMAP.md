@@ -120,6 +120,21 @@ ever entering its process, and without an AWS SDK dependency in the repo.
 **Exit criteria:** `npm test` + `npm run typecheck` green; no AWS SDK in repo dependencies; no credential in the repo.  
 **Remaining:** a real KMS/HSM deployment by the operator (key + IAM + sidecar host); key rotation is manual (no multi-key support yet); independent security review.
 
+## P2-6 — Smart Token como custodio de la CEK — **DONE (con doble local)**
+
+**Goal:** La CEK del documento queda custodiada por Smart Token (ML-KEM + contraseña maestra del emisor) y el descifrado controlado ocurre vía Gatekeeper sin exponer la CEK nunca en servidores externos.
+
+- [x] Modo explícito `smart-token-custody` (`cekCustodyMode: 'smart-token'` en `createTDCPPackage`; default `oracle` sin cambios)
+- [x] En este modo la CEK se entrega a Smart Token y el paquete NO contiene CEK envuelta por el Oracle (*en vez de*, no *además de*: documentado en `docs/CSG_SMART_TOKEN_BRIDGE.md` §C)
+- [x] Gatekeeper sigue siendo el único camino: valida y consume el grant de un solo uso y solo entonces Smart Token libera la CEK para descifrar en local; sin grant, Smart Token ni se contacta
+- [x] Falla cerrado: sin custodio, sin master, DENIED o servicio caído → denegado, sin fallback al Oracle
+- [x] Cliente Smart Token existente reutilizado sin reescribir (`HttpSmartTokenCekCustodian` adaptador fino; sin endpoints inventados)
+- [x] Tests: `src/protection/smart-token-cek-custody.test.ts` (11 tests: roundtrip, smoke, sin grant, master incorrecto, servicio caído, sin custodio/master, formato tamperado, regresión oracle, adaptador HTTP con fetch falso) + ejemplo smoke `examples/smart-token-cek-custody-example.ts`
+- [x] Sin variables de entorno nuevas (`SMART_TOKEN_API_URL` / `SMART_TOKEN_API_KEY` ya existen; el master es por operación, nunca se guarda)
+
+**Exit criteria:** Roundtrip proteger/abrir con custodia y denegación sin grant / con servicio caído, todo verificado en tests.  
+**Remaining:** Smoke contra el servicio Smart Token REAL (requiere `api/` levantado; el contrato es el mismo ya verificado por el puente en 2026-11-11). Sin pruebas formales (deferred, como el resto del repo).
+
 ## Explicitly deferred
 
 - Full IRM SaaS parity (Seclore / Virtru / Digify feature race)

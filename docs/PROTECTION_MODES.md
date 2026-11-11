@@ -7,6 +7,9 @@
 | `smart_token` | Smart-Token-Prod | No | **Obligatorio** | No |
 | `smart_token_csg` | Smart-Token-Prod | No | **Obligatorio** | Sí |
 | `csg_only` | No | No | No | Solo integridad |
+| `smart-token-custody` (P2-6) | AES-256-GCM, CEK custodiada por Smart Token | Sí (único camino) | **Obligatorio** | No |
+
+`smart-token-custody` es el modo P2-6: paquete TDCP normal (cifrado AES-256-GCM) cuya CEK vive custodiada en Smart Token (ML-KEM + contraseña maestra del emisor) en vez de envuelta por el Oracle. El Gatekeeper sigue autorizando cada apertura (grant de un solo uso, revocación, anti-replay) y solo entonces Smart Token libera la CEK para el descifrado local. Sin grant, sin master o con el servicio caído, falla cerrado. Detalle completo en `docs/CSG_SMART_TOKEN_BRIDGE.md` §C; código en `src/protection/smart-token-cek-custody.ts`.
 
 ## Smart Token (repo aislado)
 

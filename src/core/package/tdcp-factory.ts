@@ -31,6 +31,11 @@ import {
 import { sealPackage, attachPackageSeal, type CsgPackageSealMode } from './csg-package-seal.ts';
 import type { TDCPPackage } from './package-format.ts';
 import { splitIntoABCFragments } from './ultra-critical.ts';
+import type {
+  SmartTokenCekCustodian,
+  SmartTokenCekCustodyMode,
+  SmartTokenCekCustodyRef,
+} from '../../protection/smart-token-cek-custody.ts';
 
 export interface CreateTDCPPackageInput {
   plaintext: ArrayBuffer;
@@ -67,11 +72,35 @@ export interface CreateTDCPPackageInput {
    * `off`: never seal. Only the remote sidecar counts — never a local seal.
    */
   csgSeal?: CsgPackageSealMode;
+  /**
+   * Custodia de la CEK (P2-6). `'oracle'` (default, sin cambios: la CEK
+   * se envuelve con el secreto del Oracle) o `'smart-token'`: la CEK se
+   * entrega custodiada a Smart Token y el paquete NO contiene CEK
+   * envuelta por el Oracle. Decisión documentada en
+   * docs/CSG_SMART_TOKEN_BRIDGE.md (en vez de, no además: una segunda
+   * copia envuelta por el Oracle anularía la custodia).
+   */
+  cekCustodyMode?: SmartTokenCekCustodyMode;
+  /**
+   * Custodio Smart Token (adaptador HTTP real o doble de tests).
+   * Obligatorio cuando cekCustodyMode === 'smart-token'.
+   */
+  smartTokenCustodian?: SmartTokenCekCustodian;
+  /**
+   * Contraseña maestra decidida por el emisor. Obligatoria cuando
+   * cekCustodyMode === 'smart-token'. Se usa solo en esta llamada y
+   * nunca se guarda: ni en el paquete, ni en logs, ni en estado.
+   */
+  smartTokenMaster?: string;
 }
 
 /**
  * Creates a TDCPPackage, registers its policy in the Oracle, and wraps the CEK
  * under (password root key XOR Oracle document wrap secret).
+ *
+ * With cekCustodyMode === 'smart-token' (P2-6) the CEK is instead handed to
+ * the Smart Token custodian and the package carries no Oracle-wrapped CEK:
+ * only the artifact reference. The Gatekeeper still authorizes every open.
  *
  * The returned bytes contain ciphertext only. Copying them does not copy
  * authorization, wrap secrets, or grants.
@@ -88,6 +117,22 @@ export async function createTDCPPackage(input: CreateTDCPPackageInput): Promise<
     (input.oracle ? new InProcessAuthority(input.oracle) : null);
   if (!authority) {
     throw new Error('AUTHORITY_REQUIRED: createTDCPPackage requires authority or oracle');
+  }
+
+  // P2-6: fallar cerrado ANTES de registrar nada. Sin custodio o sin
+  // master no se crea un paquete en custodia que luego no se pueda abrir.
+  const cekCustodyMode: SmartTokenCekCustodyMode = input.cekCustodyMode ?? 'oracle';
+  if (cekCustodyMode === 'smart-token') {
+    if (!input.smartTokenCustodian) {
+      throw new Error(
+        'SMART_TOKEN_CUSTODY_REQUIRES_CUSTODIAN: cekCustodyMode smart-token exige smartTokenCustodian'
+      );
+    }
+    if (!input.smartTokenMaster) {
+      throw new Error(
+        'SMART_TOKEN_CUSTODY_REQUIRES_MASTER: cekCustodyMode smart-token exige smartTokenMaster (contraseña maestra del emisor)'
+      );
+    }
   }
 
   // Reserve the identity before producing ciphertext. A random-ID collision
@@ -164,21 +209,44 @@ export async function createTDCPPackage(input: CreateTDCPPackageInput): Promise<
     ciphertextBase64 = arrayBufferToBase64(ciphertext);
   }
 
-  const rootKey = await deriveRootKeyFromSecret(
-    input.password,
-    salt,
-    TDCP_DEFAULT_PBKDF2_ITERATIONS
-  );
-  const kwk = await deriveKeyWrappingKey(
-    rootKey,
-    salt,
-    documentId,
-    TDCP_ENVELOPE_WRAP_EPOCH,
-    oracleWrapSecret
-  );
-  const ivKey = generateRandomBytes(12);
-  const wrappedKeyBytes = await encryptAESGCM(kwk, rawCek, ivKey);
-  wipeBuffer(rawCek);
+  // Custodia de la CEK (P2-6). En modo 'smart-token' la CEK se entrega al
+  // custodio Smart Token y el paquete queda SIN copia envuelta por el
+  // Oracle. El secreto de wrap del Oracle se registró igual (la política,
+  // la revocación y el consumo de un solo uso del grant siguen viviendo
+  // en el Authority), pero no envuelve nada en este modo.
+  let wrappedKeyBase64: string | undefined;
+  let ivKeyBase64: string | undefined;
+  let smartTokenCustody: SmartTokenCekCustodyRef | undefined;
+  if (cekCustodyMode === 'smart-token') {
+    try {
+      const ref = await input.smartTokenCustodian!.protectCek(rawCek, input.smartTokenMaster!);
+      smartTokenCustody = { artifactId: ref.artifactId, version: 1 };
+    } catch (err: unknown) {
+      wipeBuffer(rawCek);
+      throw new Error(
+        `SMART_TOKEN_CUSTODY_PROTECT_FAILED: no se pudo custodiar la CEK en Smart Token: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+    wipeBuffer(rawCek);
+  } else {
+    const rootKey = await deriveRootKeyFromSecret(
+      input.password,
+      salt,
+      TDCP_DEFAULT_PBKDF2_ITERATIONS
+    );
+    const kwk = await deriveKeyWrappingKey(
+      rootKey,
+      salt,
+      documentId,
+      TDCP_ENVELOPE_WRAP_EPOCH,
+      oracleWrapSecret
+    );
+    const ivKey = generateRandomBytes(12);
+    const wrappedKeyBytes = await encryptAESGCM(kwk, rawCek, ivKey);
+    wipeBuffer(rawCek);
+    wrappedKeyBase64 = arrayBufferToBase64(wrappedKeyBytes);
+    ivKeyBase64 = arrayBufferToBase64(ivKey);
+  }
 
   const pkg: TDCPPackage = {
     magicHeader: TDCP_MAGIC_HEADER,
@@ -204,10 +272,11 @@ export async function createTDCPPackage(input: CreateTDCPPackageInput): Promise<
       kdfIterations: TDCP_DEFAULT_PBKDF2_ITERATIONS,
       documentId,
       packageId,
+      ...(cekCustodyMode === 'smart-token' ? { custodyMode: 'smart-token' as const } : {}),
     },
     integrityHash: '',
-    wrappedKeyBase64: arrayBufferToBase64(wrappedKeyBytes),
-    ivKeyBase64: arrayBufferToBase64(ivKey),
+    ...(wrappedKeyBase64 && ivKeyBase64 ? { wrappedKeyBase64, ivKeyBase64 } : {}),
+    ...(smartTokenCustody ? { smartTokenCustody } : {}),
     envelopeEpoch: TDCP_ENVELOPE_WRAP_EPOCH,
     ultraCritical,
   };

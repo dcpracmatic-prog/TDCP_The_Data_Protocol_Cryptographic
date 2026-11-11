@@ -102,6 +102,9 @@ Optional variables (see `.env.example`):
 SMART_TOKEN_API_URL=http://127.0.0.1:8000
 SMART_TOKEN_API_KEY=   # same as SMART_TOKEN_API_KEY on the API process
 # Master is never stored by TDCP; supply per operation only
+# Custodia de la CEK (P2-6): mismo servicio y mismas variables; el modo se
+# elige por operación (cekCustodyMode: 'smart-token') y el master se entrega
+# por operación (smartTokenMaster), nunca en el entorno. Ver §C arriba.
 
 # CSG sidecar (optional; leave unset to skip)
 # CSG_SEAL_URL=http://127.0.0.1:8010
@@ -123,7 +126,44 @@ SMART_TOKEN_API_KEY=   # same as SMART_TOKEN_API_KEY on the API process
 3. Store the seal in the audit sink; verification is independent (`verificar_sello`).
 4. Failed unauthorized seal attempts accumulate conatus; after threshold the Notario enters structural rupture until out-of-band recovery.
 
-### C. What this bridge deliberately does **not** do
+### C. Smart Token como custodio de la CEK — modo `smart-token-custody` (P2-6, FUNCIONANDO con doble local)
+
+Nuevo camino REAL dentro del paquete TDCP (no el patrón A, que custodia archivos sueltos): la CEK del documento queda custodiada por Smart Token y el descifrado controlado ocurre sin exponer la CEK nunca en servidores externos.
+
+**Flujo**
+
+1. **PROTEGER** — `createTDCPPackage({ ..., cekCustodyMode: 'smart-token', smartTokenCustodian, smartTokenMaster })`. La CEK (32 bytes) se entrega al custodio con `POST /v1/artifacts` (master en el header `X-Smart-Token-Master`, solo en esa petición). El paquete guarda solo `metadata.custodyMode: 'smart-token'` + `smartTokenCustody: { artifactId, version: 1 }`. **No contiene ninguna CEK envuelta por el Oracle** — esa es la decisión de diseño: *en vez de*, no *además de*. Una segunda copia envuelta por el Oracle anularía la custodia (bastaría el wrap del Oracle para recuperar la CEK sin Smart Token). La política, la revocación y el grant de un solo uso siguen viviendo en el Authority; el secreto de wrap del Oracle se registra igual pero no envuelve nada en este modo.
+2. **ABRIR** — `DCPGatekeeper.executeUnlock({ ..., smartTokenCustodian, smartTokenMaster })`. El Gatekeeper hace TODO lo de siempre primero (integridad del sobre, challenge, credencial + dispositivo, política, grant firmado, época de revocación, anti-replay, consumo de un solo uso del grant) y SOLO ENTONCES pide la CEK a Smart Token con `POST /v1/artifacts/{id}/open` + master. La CEK llega en claro por HTTPS al proceso que descifra, se importa como clave AES-GCM en memoria, se borra el buffer, se descifra localmente y nunca se guarda ni se reenvía.
+3. **Sin grant válido, Smart Token ni se contacta** (verificado en tests: documento revocado → 0 llamadas al custodio).
+
+**Código**: `src/protection/smart-token-cek-custody.ts` (tipos + `HttpSmartTokenCekCustodian`, adaptador fino sobre el `SmartTokenClient` existente — sin reescribirlo y sin inventar endpoints — + `smartTokenCekCustodianFromEnv()` + doble en memoria solo para tests). La factoría (`src/core/package/tdcp-factory.ts`), el Gatekeeper (`src/gatekeeper/gatekeeper.ts`) y el runtime (`src/runtime/tdcp-runtime.ts`) aceptan las opciones; el formato (`.pkg`) valida la custodia en `deserializeTDCPPackage` y liga la referencia al sobre en el hash de integridad. Modo por defecto en todo: `oracle`, sin cambios.
+
+**Variables de entorno**: NO hay variables nuevas. Se reutilizan `SMART_TOKEN_API_URL` / `SMART_TOKEN_API_KEY` (ya existen). La contraseña maestra NO vive en el entorno: la decide el emisor y se entrega por operación (`smartTokenMaster`); TDCP nunca la guarda (ni en el paquete, ni en logs, ni en estado).
+
+**Qué protege y qué NO protege**
+
+| Protege | No protege |
+|---|---|
+| La CEK no vive en el paquete ni en ningún servidor TDCP: robar el `.pkg` no da la CEK | Si el emisor pierde la contraseña maestra, el documento NO se puede recuperar (no hay recuperación) |
+| Sin grant válido del Gatekeeper no hay liberación (revocación, épocas, un solo uso intactos) | Quien tenga grant válido + master abre: el master es el factor de conocimiento en este modo (la `userPassword` de TDCP no desenvuelve nada aquí) |
+| La CEK en claro solo existe en memoria del proceso que descifra, y se borra tras importarla | No protege contra un proceso descifrador comprometido (la CEK pasa por su memoria, como en modo oracle) |
+| El wrap post-cuántico (ML-KEM-768 + AES-256-GCM) lo pone el servicio Smart Token, no TDCP | TDCP no audita el interior del servicio Smart Token: su fricción/almacenamiento son su modelo de amenaza |
+
+**Falla cerrado (sin fallback al Oracle)**
+
+| Situación | Resultado |
+|---|---|
+| Sin custodio configurado (sin URL/key) | `SMART_TOKEN_CUSTODY_NOT_CONFIGURED` |
+| Sin master en la apertura | `SMART_TOKEN_MASTER_REQUIRED` |
+| Master incorrecto o artefacto desconocido | `SMART_TOKEN_DENIED` (opaco, igual que el 403 del servicio) |
+| Servicio caído / red / 5xx | `SMART_TOKEN_UNAVAILABLE` |
+| CEK liberada con longitud ≠ 32 bytes | `SMART_TOKEN_CEK_INVALID` |
+| Proteger sin custodio o sin master | No se crea el paquete (`SMART_TOKEN_CUSTODY_REQUIRES_*`) |
+| Un intento fallido (master mal, servicio caído) consume el grant de ese intento, igual que una contraseña incorrecta en modo oracle; la siguiente apertura pide un grant nuevo. | |
+
+**Verificación**: `src/protection/smart-token-cek-custody.test.ts` — 11 tests (roundtrip con bytes idénticos, smoke serializar/deserializar, sin grant → 0 llamadas al custodio, master incorrecto → DENIED y luego abre con el correcto, servicio caído → falla cerrado, sin custodio/master → falla cerrado, proteger sin custodio/master → no crea paquete, formato tamperado → inválido, regresión modo oracle, adaptador HTTP contra fetch falso). Smoke manual con doble local: `node --experimental-strip-types examples/smart-token-cek-custody-example.ts`. Pendiente: smoke contra el servicio Smart Token REAL (requiere `api/` levantado; el contrato es el mismo que ya verificó el puente en 2026-11-11).
+
+### D. What this bridge deliberately does **not** do
 
 - Does not replace TDCP Authority with Smart Token friction state.
 - Does not allow agents to hold STP master or CSG damage master across tasks.
