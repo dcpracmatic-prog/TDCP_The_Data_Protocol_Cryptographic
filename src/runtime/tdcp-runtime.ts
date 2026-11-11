@@ -59,6 +59,12 @@ export interface CreatePackageRequest {
   allowedUserIds?: string[];
   requireUsbHsm?: boolean;
   channelEdges?: EdgeSpec[];
+  /**
+   * CSG package seal (P2-5). Passed to the factory: `required` (explicit CSG
+   * request — sidecar down means no package), `optional` (default: seal when
+   * the sidecar answers, else legacy package without seal), `off`.
+   */
+  csgSeal?: 'required' | 'optional' | 'off';
 }
 
 export class TdcpRuntime {

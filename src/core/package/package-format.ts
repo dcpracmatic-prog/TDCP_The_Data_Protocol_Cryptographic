@@ -15,6 +15,7 @@
 import { computeSHA256, bytesToHex, arrayBufferToBase64, base64ToByteLength, TDCP_DEFAULT_PBKDF2_ITERATIONS } from '../crypto/primitives.ts';
 import type { PolicyLevel } from '../authorization/types.ts';
 import type { UltraCriticalABCBundle } from './ultra-critical.ts';
+import type { CsgSealDocument } from '../../protection/csg-seal.ts';
 
 export const TDCP_MAGIC_HEADER = 'TDCP_SECURE_PKG';
 export const TDCP_CURRENT_VERSION = '2.5-SEC';
@@ -58,6 +59,20 @@ export interface TDCPPackage {
   envelopeEpoch: number;
   /** Present only when policyLevel === ULTRA_CRITICAL. */
   ultraCritical?: UltraCriticalABCBundle;
+  /**
+   * Optional CSG integrity seal over the whole package (P2-5).
+   * Covers the canonical envelope bytes (see canonicalPackageEnvelopeString):
+   * structure + full content (ciphertext, AAD, metadata, wrapped CEK,
+   * ultra-critical fragments). It lives INSIDE the .pkg so the seal travels
+   * with the package — no sidecar file needed.
+   * Absent on legacy packages: they still open via the current path, but
+   * without any CSG guarantee. The seal is an ADDITIONAL integrity layer:
+   * it never replaces AES-GCM authentication or the Gatekeeper grant.
+   * Deliberately EXCLUDED from the canonical envelope string (and therefore
+   * from integrityHash): the seal is computed over the envelope, so including
+   * it would be circular.
+   */
+  csgSeal?: CsgSealDocument;
 }
 
 /**
@@ -197,6 +212,16 @@ export async function deserializeTDCPPackage(data: ArrayBuffer | string): Promis
       };
     }
 
+    if (
+      parsed.csgSeal !== undefined &&
+      (typeof parsed.csgSeal !== 'object' || parsed.csgSeal === null)
+    ) {
+      return {
+        isValidEnvelope: false,
+        error: 'Sello CSG corrupto: el campo csgSeal no es un documento de sello válido.',
+      };
+    }
+
     if (parsed.envelopeEpoch === undefined) {
       parsed.envelopeEpoch = TDCP_ENVELOPE_WRAP_EPOCH;
     }
@@ -230,11 +255,17 @@ export async function deserializeTDCPPackage(data: ArrayBuffer | string): Promis
   }
 }
 
-export async function computePackageIntegrityHash(pkg: TDCPPackage): Promise<string> {
-  // Unkeyed envelope integrity is a corruption/tamper signal only; AES-GCM
-  // remains the authenticity boundary for ciphertext. Keep the canonical
-  // representation explicit so security-relevant metadata cannot drift.
-  const canonical = JSON.stringify({
+/**
+ * Canonical envelope string: the exact bytes the CSG package seal covers
+ * (and the string integrityHash hashes). It lists every security-relevant
+ * envelope field in a fixed order — structure + full content — and
+ * deliberately excludes `csgSeal` itself (the seal is computed over it).
+ * A package serialized, parsed and re-serialized keeps the same canonical
+ * string because JSON round-trips preserve key order and the factory writes
+ * fields in this fixed order.
+ */
+export function canonicalPackageEnvelopeString(pkg: TDCPPackage): string {
+  return JSON.stringify({
     magicHeader: pkg.magicHeader,
     version: pkg.version,
     algorithm: pkg.algorithm,
@@ -250,7 +281,18 @@ export async function computePackageIntegrityHash(pkg: TDCPPackage): Promise<str
     envelopeEpoch: pkg.envelopeEpoch,
     ultraCritical: pkg.ultraCritical ?? null,
   });
-  return computeSHA256(canonical);
+}
+
+/** Canonical envelope bytes sealed by CSG at protect time. */
+export function canonicalPackageEnvelopeBytes(pkg: TDCPPackage): Uint8Array {
+  return new TextEncoder().encode(canonicalPackageEnvelopeString(pkg));
+}
+
+export async function computePackageIntegrityHash(pkg: TDCPPackage): Promise<string> {
+  // Unkeyed envelope integrity is a corruption/tamper signal only; AES-GCM
+  // remains the authenticity boundary for ciphertext. Keep the canonical
+  // representation explicit so security-relevant metadata cannot drift.
+  return computeSHA256(canonicalPackageEnvelopeString(pkg));
 }
 
 export { arrayBufferToBase64 };

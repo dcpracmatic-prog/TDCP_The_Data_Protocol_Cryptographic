@@ -12,6 +12,7 @@ import {
 } from './csg-local-seal.ts';
 import {
   csgClientFromEnv,
+  type CsgClient,
   type CsgRemoteSeal,
   type CsgVerifyReport,
 } from './csg-client.ts';
@@ -73,25 +74,28 @@ export async function createCsgSeal(
 
 /**
  * Verify a seal against recovered content bytes.
+ * `client` (optional) injects a pre-resolved CSG sidecar client; when omitted
+ * it is resolved from the environment, as before.
  */
 export async function verifyCsgSeal(
   content: ArrayBuffer | Uint8Array,
-  seal: CsgSealDocument
+  seal: CsgSealDocument,
+  client?: CsgClient | null
 ): Promise<{ valid: boolean; reason: string; report?: CsgVerifyReport }> {
   if (isRemoteCsgSeal(seal)) {
-    const client = csgClientFromEnv();
-    if (client) {
+    const resolved = client ?? csgClientFromEnv();
+    if (resolved) {
       try {
-        const report = await client.verify(content, seal);
+        const report = await resolved.verify(content, seal);
         return {
           valid: report.todo_valido,
           reason: report.todo_valido ? 'OK' : 'REMOTE_VERIFY_FAILED',
           report,
         };
-      } catch (err) {
+      } catch {
         return {
           valid: false,
-          reason: err instanceof Error ? err.message : 'REMOTE_VERIFY_ERROR',
+          reason: 'REMOTE_VERIFY_ERROR',
         };
       }
     }

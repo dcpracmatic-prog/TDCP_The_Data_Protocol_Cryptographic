@@ -103,7 +103,8 @@ Do **not** change crypto primitives or Gatekeeper security semantics under these
 - [x] **Do not** embed CSG Rust in Node; **do not** change Gatekeeper unlock semantics
 
 **Exit criteria:** Integrators can self-host Smart Token API and call it after Gatekeeper authorization; CSG remains design-time / sidecar attestation.  
-**Remaining:** Optional CSG HTTP sidecar, end-to-end smoke with both services, formal threat-model cross-reference.
+**Remaining:** Formal threat-model cross-reference.
+**P2-5 (2026-11-11, DONE):** CSG seal wired into the `.pkg` itself — seal at protect (stored in `csgSeal`, covers the canonical envelope: structure + full content), verify in the Gatekeeper before decrypt/grant with fail-closed `CSG_PACKAGE_SEAL_FAILED`, legacy seal-less packages still open (no CSG guarantee), unit + Gatekeeper tests (`src/core/package/csg-package-seal.test.ts`, 13 tests) and real-sidecar smoke (`npm run smoke:csg-pkg`). See `docs/CSG_SMART_TOKEN_BRIDGE.md` § P2-5.
 
 ## Explicitly deferred
 

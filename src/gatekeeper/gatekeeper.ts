@@ -42,6 +42,7 @@ import type { BiometricProvider } from '../identity/biometric-provider.ts';
 import { verifyABCInterlockingIntegrity } from '../core/package/ultra-critical.ts';
 import { verifyPolicyBinding, type PolicyBinding } from '../channel/policy-binding.ts';
 import { createCsgOperationSeal, type CsgSealDocument } from '../protection/csg-seal.ts';
+import { verifyPackageSeal, type CsgPackageSealStatus } from '../core/package/csg-package-seal.ts';
 
 export interface GatekeeperUnlockOptions {
   packageData: TDCPPackage;
@@ -77,6 +78,12 @@ export interface GatekeeperUnlockResult {
   auditEventId?: string;
   /** CSG attestation binding grant + policy + device + operation. */
   csgOperationSeal?: CsgSealDocument;
+  /**
+   * Embedded CSG package-seal outcome (P2-5): `sealed-valid` (seal verified),
+   * `absent` (legacy package, no CSG guarantee — still opens via the current
+   * path). Never `sealed-invalid`/`unverifiable` on success: those fail closed.
+   */
+  csgSealStatus?: CsgPackageSealStatus;
 }
 
 function concatBuffers(a: ArrayBuffer, b: ArrayBuffer): ArrayBuffer {
@@ -132,6 +139,34 @@ export class DCPGatekeeper {
         errorMessage: 'Integridad del sobre TDCP inválida. El paquete fue alterado o está corrupto.',
       };
     }
+
+    // P2-5: verify the embedded CSG package seal BEFORE any decryption and
+    // BEFORE consuming a one-time grant. A tampered package must not burn a
+    // grant. `absent` (legacy, no seal) still opens — documented as having
+    // no CSG guarantee. A present-but-invalid or unverifiable seal fails
+    // closed: nothing is decrypted.
+    const packageSeal = await verifyPackageSeal(packageData);
+    if (!packageSeal.valid && packageSeal.status !== 'absent') {
+      await auditSink.recordEvent({
+        documentId: packageData.documentId,
+        packageId: packageData.packageId,
+        deviceId: 'GATEKEEPER',
+        credentialId: 'GATEKEEPER',
+        operationId: generateRandomId('OP'),
+        operation: requestedOperation,
+        policy: packageData.metadata?.policyLevel || 'STANDARD',
+        result: 'TAMPER_DETECTED',
+        details: `CSG_PACKAGE_SEAL_FAILED: ${packageSeal.reason}. No se descifró nada ni se consumió grant.`,
+      });
+      return {
+        success: false,
+        errorCode: 'CSG_PACKAGE_SEAL_FAILED',
+        errorMessage:
+          'Sello CSG del paquete inválido o no verificable: el contenido fue alterado o el Notario no está disponible. Apertura denegada sin descifrar.',
+        csgSealStatus: packageSeal.status,
+      };
+    }
+    const csgSealStatus: CsgPackageSealStatus = packageSeal.status;
 
     const operationId = generateRandomId('OP');
     // Test harnesses may inject a challenge, but the challenge must already be
@@ -608,6 +643,7 @@ export class DCPGatekeeper {
       grant,
       auditEventId: auditEvent.eventId,
       csgOperationSeal,
+      csgSealStatus,
     };
   }
 }

@@ -193,6 +193,10 @@ export default function EncryptPanel() {
           requireUsbHsm,
           watermarkRequired: watermark,
           blurMode,
+          // P2-5: when the operator chose a CSG mode, the embedded package
+          // seal is REQUIRED (sidecar down => no package, explicit failure).
+          // Otherwise seal opportunistically when the sidecar answers.
+          csgSeal: modeMeta.usesCsg ? 'required' : 'optional',
         });
         pkg = created.pkg;
         packageBlob = created.blob;
@@ -203,7 +207,10 @@ export default function EncryptPanel() {
           `TDCPPackage ${pkg.version} · AES-256-GCM + HKDF`,
           `documentId ${pkg.documentId} · packageId ${pkg.packageId}`,
           `Política ${policyLevel} (no viaja en el archivo)`,
-          'La contraseña sola no descifra. Apertura vía Gatekeeper.'
+          'La contraseña sola no descifra. Apertura vía Gatekeeper.',
+          pkg.csgSeal
+            ? `Sello CSG incrustado en el .pkg (Notario): ${sealSummary(pkg.csgSeal)[0]}`
+            : 'Sin sello CSG incrustado (sidecar no disponible): abre por el camino actual, sin garantía CSG.'
         );
         void addPackageHistory({
           fileName: file.name,

@@ -2,6 +2,8 @@
 
 **Status (2026-11-11): FUNCIONANDO de extremo a extremo, verificado en local.** Smart Token API (`api/` en Smart-Token-Prod) habla el contrato exacto del cliente TDCP (`sdk/typescript/src/smart-token-client.ts`): protect → open → friction con roundtrip byte-idéntico. El sidecar CSG existe: `sidecar/` en el repo CSG (binario Rust `csg-sidecar` sobre el crate `sello-integridad`, loopback 127.0.0.1:8010) y el cliente TDCP (`src/protection/csg-client.ts`) sella y verifica contra él. Ejemplos verificados: `examples/smart-token-bridge-example.ts` y `examples/csg-seal-verify-example.ts`.
 
+**P2-5 (2026-11-11): sello CSG incrustado en el .pkg.** El puente ya no es solo atestación de operaciones: al proteger, el paquete completo se sella con el sidecar y el sello viaja DENTRO del `.pkg` (`csgSeal`); al abrir, el Gatekeeper verifica el sello ANTES de descifrar y falla cerrado si el contenido fue alterado. Detalle y reglas de fallo en la sección «P2-5: sello CSG incrustado en el .pkg» abajo. Smoke: `npm run smoke:csg-pkg`.
+
 **Constraint:** External apps and bridges unlock TDCP packages **only through the Gatekeeper**. Smart Token and CSG are additive planes (long-lived file defence + integrity attestation). They must not become a second control plane that bypasses grants.
 
 ## Goal
@@ -50,15 +52,25 @@ Endpoints used by the TDCP bridge:
 
 Authentication: `Authorization: Bearer <SMART_TOKEN_API_KEY>`.
 
-### 2. CSG / Sello (sidecar Rust, verificado)
+### 2. CSG / Sello (sidecar, verificado)
 
-The public surface is the Rust crate `sello-integridad` (`Notario`, `NotarioProtegido`, `Firmante`, `verificar_sello`). The HTTP sidecar ships in the CSG repo (`sidecar/`, binary `csg-sidecar`, thin wrapper over the crate — no crypto reimplemented):
+The public surface is the Rust crate `sello-integridad` (`Notario`, `NotarioProtegido`, `Firmante`, `verificar_sello`). Two HTTP sidecars implement the same contract (Ed25519 + SHA3-256, `csg.sello.v1`):
+
+- **Upstream (Rust):** `sidecar/` in the CSG repo, binary `csg-sidecar` (thin wrapper over the crate — no crypto reimplemented).
+- **In this repo (Python):** `server/csg-sidecar/main.py` — stdlib HTTP + `cryptography` only, same endpoints and field names, keys persisted under `CSG_DATA_DIR` (600). This is the sidecar the P2-5 package seal and the smoke test use; it is an implementation of the contract, not a second crypto design.
 
 ```bash
 export PATH="$HOME/.cargo/bin:$PATH"
 cd <CSG repo>/sidecar
 cargo build --release --offline
 CSG_PORT=8010 ./target/release/csg-sidecar   # http://127.0.0.1:8010
+```
+
+Or the in-repo Python sidecar:
+
+```bash
+pip install cryptography   # only dependency beyond stdlib
+CSG_PORT=8010 CSG_DATA_DIR=./data/csg-sidecar python3 server/csg-sidecar/main.py
 ```
 
 Endpoints (contract of `src/protection/csg-client.ts`): `GET /healthz`, `GET /v1/status`, `POST /v1/seal` (content_base64 + label/attributes/proyecto_id/evento_id → sello `csg.sello.v1`), `POST /v1/verify` (content_base64 + sello → `{todo_valido, checks{content_digest_match, cuerpo_no_alterado, firma_notario_valida, aceptado}}`). Notario keys are ephemeral per process; each seal carries its `notario_pub`, so seals keep verifying after a restart, but the seal chain lives in memory. Until a sidecar is present, TDCP treats CSG as a **design-time attestation hook**: document the event types to seal (grant issue, successful unlock, policy revoke) and keep the Notario master key out of the TDCP process.
@@ -117,6 +129,63 @@ SMART_TOKEN_API_KEY=   # same as SMART_TOKEN_API_KEY on the API process
 - Does not allow agents to hold STP master or CSG damage master across tasks.
 - Does not claim HSM/KMS for any of the three components unless you add them yourself.
 - Does not change TDCP crypto primitives or Gatekeeper security semantics.
+
+## P2-5: sello CSG incrustado en el .pkg
+
+El sello CSG ya no vive solo en un archivo aparte (`.csg.json`, que sigue existiendo para la atestación del *plaintext* en los paneles): desde P2-5 el paquete `.pkg` lleva su propio sello dentro, en el campo `csgSeal`. Implementación: `src/core/package/csg-package-seal.ts` (sellar/verificar), `src/core/package/package-format.ts` (campo + bytes canónicos), `src/core/package/tdcp-factory.ts` (proteger), `src/gatekeeper/gatekeeper.ts` (abrir).
+
+### Formato
+
+```jsonc
+{
+  "magicHeader": "TDCP_SECURE_PKG",
+  "version": "2.5-SEC",
+  // ... envelope TDCP sin cambios ...
+  "integrityHash": "<sha-256 del sobre, como siempre>",
+  "csgSeal": {
+    "schema": "csg.sello.v1",
+    "evento_id": "TDCP-PKG-PKG-<id>",
+    "aceptado": true,
+    "hash_contenido": "<SHA3-256 del sobre canónico>",
+    "cuerpo_hash": "<SHA3-256 del cuerpo>",
+    "firma_notario": "<Ed25519 del Notario>",
+    "notario_pub": "<clave pública del Notario>",
+    "label": "tdcp-pkg"
+    // ... resto de campos del sello, ver src/protection/csg-client.ts
+  }
+}
+```
+
+### Qué cubre exactamente
+
+El sello cubre los **bytes canónicos del sobre** (`canonicalPackageEnvelopeString` / `canonicalPackageEnvelopeBytes` en `package-format.ts`): la misma representación que calcula `integrityHash` — cabecera, versión, algoritmo, `documentId`/`packageId`, salt, IV, **ciphertext completo**, AAD, **metadata completa**, CEK envuelta, epoch y fragmentos ultra-críticos. Es decir: estructura + contenido completo del paquete.
+
+El campo `csgSeal` queda **fuera** de esos bytes a propósito: el sello se calcula sobre el sobre, así que incluirlo sería circular. Por eso `integrityHash` no cambia al añadir el sello y los paquetes viejos siguen siendo válidos.
+
+### Relación con las otras capas (no sustituye nada)
+
+| Capa | Qué garantiza | Qué pasa si falla |
+|------|---------------|-------------------|
+| Sello CSG (`csgSeal`) | Integridad del sobre completo, atestada por el Notario (tercero) | Apertura denegada ANTES de descifrar, sin consumir grant |
+| AES-256-GCM del .pkg | Autenticidad del ciphertext (tag) + AAD ligado a la política | Descifrado rechazado (`DECRYPTION_AUTH_TAG_FAILED`) |
+| Grant del Gatekeeper (un solo uso, época, anti-replay) | Autorización para ESTA operación, en ESTE dispositivo | Sin grant no hay CEK: no se descifra nada |
+
+El sello detecta lo que el `integrityHash` no puede: ese hash es SHA-256 **sin clave** — cualquiera puede alter el ciphertext y recalcularlo. El sello, en cambio, solo lo puede emitir el Notario (firma Ed25519). Por eso el Gatekeeper lo verifica antes de pedir challenge/grant: un paquete alterado no debe quemar un grant de un solo uso.
+
+### Reglas de fallo (decisión de seguridad, documentada)
+
+- **Proteger, modo `required`** (lo que pide el panel cuando el operador elige un modo con CSG): si el sidecar no está configurado o no responde, **no se crea el paquete** — error `CSG_SIDECAR_UNAVAILABLE` / `CSG_SEAL_FAILED`. Nunca se finge un sello.
+- **Proteger, modo `optional`** (por defecto en el resto de modos): si el sidecar no responde, el paquete se crea **sin sello** (forma legacy) y se informa. Nunca se sustituye por el sello local de desarrollo (`tdcp.csg-local.v1`): ese sello se genera en el proceso con clave efímera y no es una atestación del Notario; usarlo como sello de paquete sería fingir una garantía CSG.
+- **Abrir, sello presente pero inválido/corrupto/esquema desconocido** → `CSG_PACKAGE_SEAL_FAILED`, sin descifrar nada.
+- **Abrir, sello presente pero sidecar caído (no se puede verificar)** → `CSG_PACKAGE_SEAL_FAILED` (no verificable). Falla cerrado: no se abre por "no poder comprobar".
+- **Abrir, sin sello (paquete legacy)** → abre por el camino actual (`csgSealStatus: 'absent'`). Compatible hacia atrás por diseño, documentado como **sin garantía CSG**. El panel de descifrado lo avisa al cargar el archivo.
+
+Modos en código: `createTDCPPackage({ csgSeal: 'required' | 'optional' | 'off' })` (por defecto `'optional'`); el runtime lo pasa desde `tdcpRuntime.createPackage({ csgSeal })`; el panel de cifrado pide `'required'` en modos con CSG y `'optional'` en el resto.
+
+### Verificación
+
+- Tests unitarios + Gatekeeper: `src/core/package/csg-package-seal.test.ts` (13 tests; sidecar simulado con el mismo contrato, SHA3-256 + cuerpo hash).
+- Smoke end-to-end con el sidecar real: `npm run smoke:csg-pkg` (`scripts/csg-pkg-smoke.mjs` + `scripts/csg-pkg-smoke-run.ts`). Levanta el sidecar Python en un directorio temporal, protege → abre OK; altera 1 byte del ciphertext (recalculando `integrityHash`) → denegado; apaga el sidecar → el paquete sellado sigue denegado; el legacy sin sello abre. Requiere `python3` + paquete `cryptography`; si falta, el smoke aborta con exit 2 y mensaje claro en vez de fingir un aprobado.
 
 ## TypeScript clients (this repo)
 
