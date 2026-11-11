@@ -1,6 +1,6 @@
 # CSG + Smart Token bridge (free / self-hosted)
 
-**Status:** Design + optional client stubs. This repository does **not** vendor Smart-Token-Prod or CSG source trees.
+**Status (2026-11-11): FUNCIONANDO de extremo a extremo, verificado en local.** Smart Token API (`api/` en Smart-Token-Prod) habla el contrato exacto del cliente TDCP (`sdk/typescript/src/smart-token-client.ts`): protect → open → friction con roundtrip byte-idéntico. El sidecar CSG existe: `sidecar/` en el repo CSG (binario Rust `csg-sidecar` sobre el crate `sello-integridad`, loopback 127.0.0.1:8010) y el cliente TDCP (`src/protection/csg-client.ts`) sella y verifica contra él. Ejemplos verificados: `examples/smart-token-bridge-example.ts` y `examples/csg-seal-verify-example.ts`.
 
 **Constraint:** External apps and bridges unlock TDCP packages **only through the Gatekeeper**. Smart Token and CSG are additive planes (long-lived file defence + integrity attestation). They must not become a second control plane that bypasses grants.
 
@@ -50,16 +50,38 @@ Endpoints used by the TDCP bridge:
 
 Authentication: `Authorization: Bearer <SMART_TOKEN_API_KEY>`.
 
-### 2. CSG / Sello (optional service)
+### 2. CSG / Sello (sidecar Rust, verificado)
 
-The public surface is the Rust crate `sello-integridad` (`Notario`, `NotarioProtegido`, `Firmante`, `verificar_sello`). For HTTP interop without embedding Rust in the Node process:
+The public surface is the Rust crate `sello-integridad` (`Notario`, `NotarioProtegido`, `Firmante`, `verificar_sello`). The HTTP sidecar ships in the CSG repo (`sidecar/`, binary `csg-sidecar`, thin wrapper over the crate — no crypto reimplemented):
 
-- Run a minimal sidecar (Rust binary or Python binding) that exposes seal / verify over loopback, **or**
-- Call the crate from an offline process and attach the resulting seal JSON to TDCP audit events.
+```bash
+export PATH="$HOME/.cargo/bin:$PATH"
+cd <CSG repo>/sidecar
+cargo build --release --offline
+CSG_PORT=8010 ./target/release/csg-sidecar   # http://127.0.0.1:8010
+```
 
-Until a sidecar is present, TDCP treats CSG as a **design-time attestation hook**: document the event types to seal (grant issue, successful unlock, policy revoke) and keep the Notario master key out of the TDCP process.
+Endpoints (contract of `src/protection/csg-client.ts`): `GET /healthz`, `GET /v1/status`, `POST /v1/seal` (content_base64 + label/attributes/proyecto_id/evento_id → sello `csg.sello.v1`), `POST /v1/verify` (content_base64 + sello → `{todo_valido, checks{content_digest_match, cuerpo_no_alterado, firma_notario_valida, aceptado}}`). Notario keys are ephemeral per process; each seal carries its `notario_pub`, so seals keep verifying after a restart, but the seal chain lives in memory. Until a sidecar is present, TDCP treats CSG as a **design-time attestation hook**: document the event types to seal (grant issue, successful unlock, policy revoke) and keep the Notario master key out of the TDCP process.
 
-### 3. Wire into TDCP (environment)
+Verify from this repo:
+
+```bash
+CSG_SEAL_URL=http://127.0.0.1:8010 \
+node --experimental-strip-types examples/csg-seal-verify-example.ts
+# seal -> verify todo_valido:true; altered content -> todo_valido:false
+```
+
+### 3. Verify the Smart Token bridge too
+
+```bash
+# API running on :8000, then from this repo:
+SMART_TOKEN_API_URL=http://127.0.0.1:8000 SMART_TOKEN_API_KEY=<same key> \
+node --experimental-strip-types examples/smart-token-bridge-example.ts
+# Verified 2026-11-11: protect 250 ms, open 210 ms, 1,019 bytes byte-identical, friction OK.
+# Note: Smart Token API fix 2026-11-11 — local-storage open no longer deletes the artifact.
+```
+
+### 4. Wire into TDCP (environment)
 
 Optional variables (see `.env.example`):
 
@@ -96,9 +118,9 @@ SMART_TOKEN_API_KEY=   # same as SMART_TOKEN_API_KEY on the API process
 - Does not claim HSM/KMS for any of the three components unless you add them yourself.
 - Does not change TDCP crypto primitives or Gatekeeper security semantics.
 
-## TypeScript client stub (this repo)
+## TypeScript clients (this repo)
 
-A minimal fetch-based client lives at `sdk/typescript/src/smart-token-client.ts` and is re-exported from the SDK index. It only talks to a self-hosted Smart Token API; no npm dependency beyond the platform `fetch`.
+Two minimal fetch-based clients live in this repo: `sdk/typescript/src/smart-token-client.ts` (Smart Token: healthz/protect/open/friction, re-exported from the SDK index) and `src/protection/csg-client.ts` (`CsgClient`: healthz/status/seal/verify against the CSG sidecar, plus `csgClientFromEnv()` reading `CSG_SEAL_URL` / `VITE_CSG_SEAL_URL`). Both only talk to self-hosted services on loopback; no npm dependency beyond the platform `fetch`.
 
 ```ts
 import { SmartTokenClient } from '../sdk/typescript/src/index.ts';
@@ -112,7 +134,13 @@ const health = await stp.healthz();
 // protect / open require master per call — never persist it in TDCP state
 ```
 
-CSG remains out-of-process; no Node binding is shipped in this update.
+```ts
+import { CsgClient } from '../src/protection/csg-client.ts';
+
+const csg = new CsgClient({ baseUrl: 'http://127.0.0.1:8010' });
+const sello = await csg.seal(content, { label: 'tdcp-integrity', proyecto_id: 'tdcp' });
+const report = await csg.verify(content, sello); // report.todo_valido === true
+```
 
 ## Security honesty
 
