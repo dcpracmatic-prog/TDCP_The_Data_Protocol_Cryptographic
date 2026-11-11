@@ -15,6 +15,7 @@ on:
     branches: ["main"]
   schedule:
     - cron: '30 2 * * 0'
+  workflow_dispatch:
 
 permissions:
   contents: read # for actions/checkout to fetch code
@@ -32,7 +33,6 @@ jobs:
         id: report
         uses: bearer/bearer-action@828eeb928ce2f4a7ca5ed57fb8b59508cb8c79bc
         with:
-          api-key: ${{ secrets.BEARER_TOKEN }}
           format: sarif
           output: results.sarif
           exit-code: 0
