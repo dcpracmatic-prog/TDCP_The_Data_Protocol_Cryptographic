@@ -106,11 +106,25 @@ Do **not** change crypto primitives or Gatekeeper security semantics under these
 **Remaining:** Formal threat-model cross-reference.
 **P2-5 (2026-11-11, DONE):** CSG seal wired into the `.pkg` itself — seal at protect (stored in `csgSeal`, covers the canonical envelope: structure + full content), verify in the Gatekeeper before decrypt/grant with fail-closed `CSG_PACKAGE_SEAL_FAILED`, legacy seal-less packages still open (no CSG guarantee), unit + Gatekeeper tests (`src/core/package/csg-package-seal.test.ts`, 13 tests) and real-sidecar smoke (`npm run smoke:csg-pkg`). See `docs/CSG_SMART_TOKEN_BRIDGE.md` § P2-5.
 
+## P0-2 — External signing backend (KMS/HSM sidecar) — **DONE**
+
+**Goal:** The Authority can sign grants with a real KMS/HSM without the key
+ever entering its process, and without an AWS SDK dependency in the repo.
+
+- [x] `OracleKeyStore` contract documented as the extension point (`src/oracle/oracle-key-store.ts`): what it promises, what it does not promise; non-exportable stores throw from `getOrCreateSigningKey()` instead of faking a private key
+- [x] `TDCP_SIGNING_BACKEND=external` (`server/authority/external-signing-backend.ts`): HTTP sidecar (`TDCP_SIGNING_EXTERNAL_URL`) and/or local command (`TDCP_SIGNING_EXTERNAL_CMD`); fail closed on any signer failure, no silent fallback to `file`; unknown backend values refuse to start
+- [x] Example AWS KMS sidecar (`examples/kms-signing-sidecar/`, fake mode + real KMS mode with DER→raw conversion, minimum IAM `kms:Sign` + `kms:GetPublicKey`) + local-command fake signer + deployment docs (`docs/AUTHORITY.md`, `.env.example`)
+- [x] USB-HSM (`server/authority/usb-hsm.ts`) documented as user identity, not grant signing; two honest plug-in paths noted, none faked
+- [x] Tests: fake sidecar end-to-end (sign + verify), fail-closed on dead signer, local-command signer, config validation
+
+**Exit criteria:** `npm test` + `npm run typecheck` green; no AWS SDK in repo dependencies; no credential in the repo.  
+**Remaining:** a real KMS/HSM deployment by the operator (key + IAM + sidecar host); key rotation is manual (no multi-key support yet); independent security review.
+
 ## Explicitly deferred
 
 - Full IRM SaaS parity (Seclore / Virtru / Digify feature race)
 - Office plugin suite, email gateway, CASB marketplace listing
 - Firebase / Gemini in the control plane
 - Formal cryptographic proofs
-- Real HSM/KMS-backed Authority signing (file + kms-stub only today; interface ready)
+- Real HSM/KMS deployment in production (backend + KMS sidecar example shipped in P0-2; the operator still has to deploy a real key and pass independent review)
 - Vendoring Smart-Token-Prod or CSG source into this repository

@@ -22,6 +22,42 @@ export type OracleKeyStoreKind =
   | 'USB_HSM'
   | 'CLOUD_HSM';
 
+/**
+ * OracleKeyStore — the single extension point for Authority signing (P0-2).
+ *
+ * What it promises:
+ * - `getKeyId()` — stable id of the signing key, reported in grants
+ *   (`oracleKeyId`) so verifiers know which key signed.
+ * - `getPublicKey()` — the P-256 public key, used to publish `/v1/public-key`
+ *   and to verify grants. Must work even when the private key is
+ *   non-exportable (KMS/HSM/external signer).
+ * - `signCanonical(canonicalUtf8)` — sign the exact canonical grant bytes
+ *   (UTF-8) with ECDSA P-256 + SHA-256 and return the raw signature
+ *   (r||s, 64 bytes), the same bytes WebCrypto `subtle.sign` returns.
+ *   This is the method the Authority actually uses to sign grants.
+ *   Every production backend MUST implement it.
+ * - `getOrCreateSigningKey()` — only for backends that hold an extractable
+ *   key in this process (dev memory, file JWK). Backends whose key is
+ *   non-exportable MUST make it throw a clear error — never return a fake,
+ *   dummy, or borrowed private key. `AuthorizationOracle.initialize()`
+ *   tolerates that: when `signCanonical` exists it only checks that
+ *   `getPublicKey()` works.
+ *
+ * What it does NOT promise:
+ * - It never exports, logs, or persists a private key. A backend that
+ *   cannot sign without exporting the key is not a production backend.
+ * - It does not decide policy, revocation, or replay — the Oracle does.
+ *   Signing happens only after the Oracle has approved the grant.
+ * - `isProductionGrade` is an operator attestation, not a measurement:
+ *   it is true only when the key really lives in a KMS/HSM (or equivalent)
+ *   with a non-exportable key. A local key that merely implements
+ *   `signCanonical` (e.g. the fake sidecar) is NOT production-grade.
+ *
+ * To plug a real KMS/HSM, implement this interface (or use the ready-made
+ * `ExternalOracleKeyStore` in server/authority/external-signing-backend.ts,
+ * which delegates to an HTTP sidecar or a local signer command) — no other
+ * Authority code needs to change.
+ */
 export interface OracleKeyStore {
   readonly kind: OracleKeyStoreKind;
   readonly isProductionGrade: boolean;

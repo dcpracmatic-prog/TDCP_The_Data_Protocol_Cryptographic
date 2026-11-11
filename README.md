@@ -57,7 +57,7 @@ Details: [`MVP.md`](./MVP.md) · Authority: [`docs/AUTHORITY.md`](./docs/AUTHORI
 - Ops: [`docs/OPS.md`](./docs/OPS.md) · Security review pack: [`docs/SECURITY_REVIEW_PACK.md`](./docs/SECURITY_REVIEW_PACK.md)
 - Commercial sketch: [`docs/COMMERCIAL.md`](./docs/COMMERCIAL.md) · Landing copy: [`docs/LANDING_COPY.md`](./docs/LANDING_COPY.md)
 
-**Signing honesty:** `TDCP_SIGNING_BACKEND=file` (default) persists an extractable JWK — **not HSM-grade**. Set `TDCP_AUTHORITY_KEY_PASSPHRASE` to encrypt the private key at rest (AES-256-GCM). No AWS KMS runtime dependency; plug a custom `OracleKeyStore` for real KMS/HSM.
+**Signing honesty:** `TDCP_SIGNING_BACKEND=file` (default) persists an extractable JWK — **not HSM-grade**. Set `TDCP_AUTHORITY_KEY_PASSPHRASE` to encrypt the private key at rest (AES-256-GCM). No AWS KMS runtime dependency; `TDCP_SIGNING_BACKEND=external` delegates signing to a KMS/HSM sidecar (example in `examples/kms-signing-sidecar/`, docs in `docs/AUTHORITY.md`).
 - Local Authority + web: `./scripts/start-prod-stack.sh` or `docker compose up --build`
 
 
