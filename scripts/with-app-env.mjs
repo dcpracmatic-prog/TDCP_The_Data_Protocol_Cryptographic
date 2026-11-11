@@ -111,6 +111,14 @@ function main(argv) {
     process.exit(2);
   }
   const env = mergeAppEnv(readAppEnv(projectRoot()), process.env);
+  // Resolve bare commands (e.g. `vite`) from the workspace's node_modules/.bin.
+  // `npm run` adds .bin to PATH, but a direct `node scripts/with-app-env.mjs
+  // vite build` (as CI does) does not — spawn then failed with ENOENT (127)
+  // even though vite was installed. Prepending .bin makes the wrapper work
+  // the same inside and outside npm.
+  const pathKey = Object.keys(env).find((k) => k.toUpperCase() === "PATH") ?? "PATH";
+  const binDir = join(projectRoot(), "node_modules", ".bin");
+  env[pathKey] = env[pathKey] ? `${binDir}:${env[pathKey]}` : binDir;
   const child = spawn(command, args, { stdio: "inherit", env });
   // The dev server is long-running and is stopped by signalling this wrapper.
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
