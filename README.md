@@ -3,6 +3,8 @@
 [![CodeQL Advanced](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/codeql.yml/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/codeql.yml)
 [![Codacy Security Scan](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/codacy.yml/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/codacy.yml)
 [![GitHub Advanced Security](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/agents/github-advanced-security/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/agents/github-advanced-security)
+[![Dev Environment Prebuilds](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/codespaces/create_codespaces_prebuilds/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/codespaces/create_codespaces_prebuilds)
+[![Dependency Graph](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/dependabot/update-graph/badge.svg)](https://github.com/dcpracmatic-prog/TDCP_The_Data_Protocol_Cryptographic/actions/workflows/dependabot/update-graph)
 
 # **TDCP** 
 
