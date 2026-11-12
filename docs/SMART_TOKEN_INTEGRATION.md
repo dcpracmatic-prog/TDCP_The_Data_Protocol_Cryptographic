@@ -37,4 +37,4 @@ uvicorn api.main:app --host 0.0.0.0 --port 8000
 # o scripts/start-sidecars.sh desde TDCP
 ```
 
-Copiar la misma key a Vercel como `VITE_SMART_TOKEN_API_KEY`.
+Copiar la misma key a Vercel como `VITE_SMART_TOKEN_API_KEY`: la key del despliegue propio autoalojado del operador, nunca una key personal o de producción de otro despliegue.
