@@ -32,10 +32,14 @@
     "smoke:viewer-e2e": "node --experimental-strip-types --test-force-exit --test test/fake-smart-token/viewer-e2e.test.ts",
     "smoke:csg-pkg": "node scripts/csg-pkg-smoke.mjs",
     "test:channel-guardian": "npm run build:channel-guardian && node --test packages/channel-guardian/test/guardian.test.mjs",
-    "build:channel-guardian": "cd packages/channel-guardian && npm run build"
+    "build:channel-guardian": "cd packages/channel-guardian && npm install --include=dev && npm run build"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
+    "@types/node": "^22.16.5",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.2.0",
     "lightningcss": "^1.28.0",
     "nitro": "3.0.260610-beta",
@@ -96,10 +100,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.20.0",
-    "@types/node": "^22.16.5",
-    "@types/pg": "^8.11.10",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
     "eslint": "^9.20.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.6",
