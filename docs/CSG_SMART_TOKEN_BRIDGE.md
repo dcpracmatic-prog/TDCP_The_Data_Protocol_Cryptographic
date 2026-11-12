@@ -161,7 +161,7 @@ Nuevo camino REAL dentro del paquete TDCP (no el patrón A, que custodia archivo
 | Proteger sin custodio o sin master | No se crea el paquete (`SMART_TOKEN_CUSTODY_REQUIRES_*`) |
 | Un intento fallido (master mal, servicio caído) consume el grant de ese intento, igual que una contraseña incorrecta en modo oracle; la siguiente apertura pide un grant nuevo. | |
 
-**Verificación**: `src/protection/smart-token-cek-custody.test.ts` — 11 tests (roundtrip con bytes idénticos, smoke serializar/deserializar, sin grant → 0 llamadas al custodio, master incorrecto → DENIED y luego abre con el correcto, servicio caído → falla cerrado, sin custodio/master → falla cerrado, proteger sin custodio/master → no crea paquete, formato tamperado → inválido, regresión modo oracle, adaptador HTTP contra fetch falso). Smoke manual con doble local: `node --experimental-strip-types examples/smart-token-cek-custody-example.ts`. Pendiente: smoke contra el servicio Smart Token REAL (requiere `api/` levantado; el contrato es el mismo que ya verificó el puente en 2026-11-11).
+**Verificación**: `src/protection/smart-token-cek-custody.test.ts` — 11 tests (roundtrip con bytes idénticos, smoke serializar/deserializar, sin grant → 0 llamadas al custodio, master incorrecto → DENIED y luego abre con el correcto, servicio caído → falla cerrado, sin custodio/master → falla cerrado, proteger sin custodio/master → no crea paquete, formato tamperado → inválido, regresión modo oracle, adaptador HTTP contra fetch falso). Smoke manual con doble local: `node --experimental-strip-types examples/smart-token-cek-custody-example.ts`. El smoke canónico de punta a punta es `npm run smoke:viewer-e2e` contra la fake local (`docs/OFFLINE_VIEWER.md`); no existe smoke contra un servicio externo (ver `docs/SOVEREIGN_ARCHITECTURE.md`).
 
 ### D. What this bridge deliberately does **not** do
 
@@ -225,7 +225,7 @@ Modos en código: `createTDCPPackage({ csgSeal: 'required' | 'optional' | 'off' 
 ### Verificación
 
 - Tests unitarios + Gatekeeper: `src/core/package/csg-package-seal.test.ts` (13 tests; sidecar simulado con el mismo contrato, SHA3-256 + cuerpo hash).
-- Smoke end-to-end con el sidecar real: `npm run smoke:csg-pkg` (`scripts/csg-pkg-smoke.mjs` + `scripts/csg-pkg-smoke-run.ts`). Levanta el sidecar Python en un directorio temporal, protege → abre OK; altera 1 byte del ciphertext (recalculando `integrityHash`) → denegado; apaga el sidecar → el paquete sellado sigue denegado; el legacy sin sello abre. Requiere `python3` + paquete `cryptography`; si falta, el smoke aborta con exit 2 y mensaje claro en vez de fingir un aprobado.
+- Smoke end-to-end con el sidecar local en-repo: `npm run smoke:csg-pkg` (`scripts/csg-pkg-smoke.mjs` + `scripts/csg-pkg-smoke-run.ts`). Levanta el sidecar Python en un directorio temporal, protege → abre OK; altera 1 byte del ciphertext (recalculando `integrityHash`) → denegado; apaga el sidecar → el paquete sellado sigue denegado; el legacy sin sello abre. Requiere `python3` + paquete `cryptography`; si falta, el smoke aborta con exit 2 y mensaje claro en vez de fingir un aprobado.
 
 ## TypeScript clients (this repo)
 

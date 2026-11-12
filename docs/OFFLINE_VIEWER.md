@@ -144,7 +144,12 @@ falla cerrado. La fake guarda el blob envuelto (PBKDF2 + AES-256-GCM,
 del master solo su SHA-256) y **no** imita ML-KEM-768, Argon2id, la
 validation ladder ni el hang de fase 3: ver README.
 
-## Smoke manual contra el sidecar real
+**Canónico:** este es el único smoke de punta a punta del visor. No existe
+ningún smoke contra un despliegue externo: la suite completa y este e2e
+corren sin ninguna credencial real configurada, solo con la fake local y
+llaves efímeras generadas al vuelo (ver `docs/SOVEREIGN_ARCHITECTURE.md`).
+
+## Smoke manual contra el sidecar local
 
 El sidecar necesita el paquete Python `cryptography` (el Python del
 sistema lo bloquea por PEP 668; usar un venv):

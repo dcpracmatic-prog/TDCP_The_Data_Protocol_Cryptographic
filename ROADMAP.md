@@ -62,7 +62,7 @@ Do **not** change crypto primitives or Gatekeeper security semantics under these
 - [x] `docker-compose.yml` authority + web, healthchecks, volume
 - [x] `scripts/start-prod-stack.sh`, updated `DEPLOY.md` / `.env.example`
 - [x] `LAUNCH.md`, `docs/GTM.md`
-- [x] CI template includes Authority tests (`docs/ci.github.yml`)
+- [x] CI template includes Authority tests (`.github/workflows/ci.yml`)
 
 ## P5 — Commercial hardening (this PR) — **DONE (honest MVP)**
 
@@ -158,7 +158,7 @@ ever entering its process, and without an AWS SDK dependency in the repo.
 - [x] Sin variables de entorno nuevas (`SMART_TOKEN_API_URL` / `SMART_TOKEN_API_KEY` ya existen; el master es por operación, nunca se guarda)
 
 **Exit criteria:** Roundtrip proteger/abrir con custodia y denegación sin grant / con servicio caído, todo verificado en tests.  
-**Remaining:** Smoke contra el servicio Smart Token REAL (requiere `api/` levantado; el contrato es el mismo ya verificado por el puente en 2026-11-11). Sin pruebas formales (deferred, como el resto del repo).
+**Remaining:** Sin pruebas formales (deferred, como el resto del repo). El smoke canónico es `npm run smoke:viewer-e2e` contra la fake local (ver `docs/SOVEREIGN_ARCHITECTURE.md`); no existe smoke contra un servicio externo.
 
 ## P0-4 — Paquete de revisión de seguridad independiente — **DONE (preparación)**
 

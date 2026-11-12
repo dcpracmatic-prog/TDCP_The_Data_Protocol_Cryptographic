@@ -14,8 +14,10 @@ services:
       # Default stays token mode so ./scripts/start-prod-stack.sh keeps working.
       # For OIDC/mTLS see docs/ADMIN_AUTH.md (set TDCP_AUTHORITY_ADMIN_AUTH + related env).
       - TDCP_AUTHORITY_ADMIN_AUTH=${TDCP_AUTHORITY_ADMIN_AUTH:-token}
-      # Local compose default only — change before any shared deploy; ignored when mode≠token
-      - TDCP_AUTHORITY_ADMIN_TOKEN=${TDCP_AUTHORITY_ADMIN_TOKEN:-local-dev-only-change-me}
+      # Sin default en el repo: el token lo genera por corrida ./scripts/start-prod-stack.sh
+      # (openssl rand -hex 32) o lo exporta el operador. Sin el, compose falla cerrado.
+      # Ignorado cuando mode≠token.
+      - TDCP_AUTHORITY_ADMIN_TOKEN=${TDCP_AUTHORITY_ADMIN_TOKEN:?set TDCP_AUTHORITY_ADMIN_TOKEN; start-prod-stack.sh generates one per run}
       - TDCP_SIGNING_BACKEND=${TDCP_SIGNING_BACKEND:-file}
       # Optional OIDC (pass through when set on host)
       - TDCP_OIDC_ISSUER=${TDCP_OIDC_ISSUER:-}
@@ -65,9 +67,10 @@ services:
       - VITE_AUTH_ENABLED=false
       - VITE_TDCP_AUTHORITY_URL=http://authority:8787
       - TDCP_AUTHORITY_URL=http://authority:8787
-      # LOCAL DEMO ONLY — mirrors admin token into Vite for encrypt-via-UI against remote Authority
-      - VITE_TDCP_AUTHORITY_ADMIN_TOKEN=${TDCP_AUTHORITY_ADMIN_TOKEN:-local-dev-only-change-me}
-      - TDCP_AUTHORITY_ADMIN_TOKEN=${TDCP_AUTHORITY_ADMIN_TOKEN:-local-dev-only-change-me}
+      # LOCAL DEMO ONLY — mirrors the per-run admin token from the environment into Vite
+      # for encrypt-via-UI against the local Authority (same token as the authority service).
+      - VITE_TDCP_AUTHORITY_ADMIN_TOKEN=${TDCP_AUTHORITY_ADMIN_TOKEN:?set TDCP_AUTHORITY_ADMIN_TOKEN; start-prod-stack.sh generates one per run}
+      - TDCP_AUTHORITY_ADMIN_TOKEN=${TDCP_AUTHORITY_ADMIN_TOKEN:?set TDCP_AUTHORITY_ADMIN_TOKEN; start-prod-stack.sh generates one per run}
       - PORT=8080
     depends_on:
       authority:

@@ -22,7 +22,8 @@ function readAdminToken() {
   if (existsSync(p)) {
     return readFileSync(p, 'utf8').trim();
   }
-  return 'local-dev-only-change-me';
+  // Sin default en el repo: sin token el smoke falla cerrado (ver main()).
+  return null;
 }
 
 const BASE = (process.env.TDCP_AUTHORITY_URL || 'http://127.0.0.1:8787').replace(/\/$/, '');
@@ -58,6 +59,13 @@ async function json(method, path, body, opts = {}) {
 }
 
 async function main() {
+  if (!TOKEN) {
+    console.error(
+      '[smoke:mvp] falta TDCP_AUTHORITY_ADMIN_TOKEN (o .mvp/admin-token); ' +
+        'genera uno con ./scripts/start-mvp.sh o exporta la variable'
+    );
+    process.exit(1);
+  }
   console.log(`[smoke:mvp] Authority ${BASE}`);
 
   // 1) health

@@ -154,4 +154,4 @@ This product tree must **not** include Firebase, Gemini, or AI Studio `server.ts
 
 ## CI workflow file
 
-GitHub Actions YAML lives at `docs/ci.github.yml` (copy into `.github/workflows/ci.yml` with a token that has the `workflow` scope). Includes Authority tests via `npm test`.
+GitHub Actions YAML lives at `.github/workflows/ci.yml`. Includes Authority tests via `npm test`.

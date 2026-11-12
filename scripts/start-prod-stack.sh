@@ -9,8 +9,17 @@ cd "$ROOT"
 AUTHORITY_PORT="${TDCP_AUTHORITY_PORT:-8787}"
 WEB_PORT="${PORT:-8080}"
 DATA_DIR="${TDCP_AUTHORITY_DATA_DIR:-$ROOT/data/authority}"
-# Local default only — override in real deploys
-export TDCP_AUTHORITY_ADMIN_TOKEN="${TDCP_AUTHORITY_ADMIN_TOKEN:-local-dev-only-change-me}"
+# Sin default en el repo: genera un token por corrida (o respeta el que
+# ya exporto el operador). El servidor responde 503 ADMIN_TOKEN_NOT_CONFIGURED
+# sin token (server/authority/admin-auth.ts); el token nunca se imprime.
+if [[ -z "${TDCP_AUTHORITY_ADMIN_TOKEN:-}" ]]; then
+  if command -v openssl >/dev/null 2>&1; then
+    export TDCP_AUTHORITY_ADMIN_TOKEN="$(openssl rand -hex 32)"
+  else
+    export TDCP_AUTHORITY_ADMIN_TOKEN="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('hex'))")"
+  fi
+  echo "[prod-stack] TDCP_AUTHORITY_ADMIN_TOKEN generado para esta corrida (no persistido)"
+fi
 export TDCP_SIGNING_BACKEND="${TDCP_SIGNING_BACKEND:-file}"
 mkdir -p "$DATA_DIR"
 

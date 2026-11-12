@@ -147,7 +147,7 @@ verificarlo en vivo, no darlo por hecho.
 | CSG sello en paquete | 13 tests (`src/core/package/csg-package-seal.test.ts`) | `npm test` (incluidos) |
 | Custodia Smart Token | 11 tests (`src/protection/smart-token-cek-custody.test.ts`) | `npm test` (incluidos) |
 | Store Postgres | `src/authority/postgres-store.test.ts` contra PGLite embebido (mismo SQL); Supabase real verificado por la API de Management, no por conexión directa (el sandbox bloquea el puerto 5432) | `npm test`; ver `docs/OPS.md` |
-| Smoke sello CSG real | `npm run smoke:csg-pkg` (sidecar real; altera 1 byte → denegado) | Requiere `python3` + paquete `cryptography` |
+| Smoke sello CSG (sidecar local) | `npm run smoke:csg-pkg` (sidecar local en-repo; altera 1 byte → denegado) | Requiere `python3` + paquete `cryptography` |
 | Análisis estático | Workflows Bearer, CodeQL y Codacy en `.github/workflows/` + CI en `ci.yml` | Ver runs de CI del PR en GitHub |
 
 > Los números de arriba son los medidos en el clon de trabajo de P0-4
