@@ -63,11 +63,13 @@ export function edgeKey(e: EdgeSpec): string {
   return `${e.source}->${e.destination}`;
 }
 
-/** Deterministic canonical JSON for signing (edges sorted by key). */
+/** Deterministic canonical JSON for signing (edges sorted by key with zero string allocation). */
 export function canonicalizePolicy(policy: ChannelPolicy): string {
-  const edges = [...policy.edges].sort((a, b) =>
-    edgeKey(a).localeCompare(edgeKey(b)),
-  );
+  const edges = [...policy.edges].sort((a, b) => {
+    if (a.source !== b.source) return a.source < b.source ? -1 : 1;
+    if (a.destination !== b.destination) return a.destination < b.destination ? -1 : 1;
+    return 0;
+  });
   return JSON.stringify({
     documentId: policy.documentId,
     grantId: policy.grantId,
