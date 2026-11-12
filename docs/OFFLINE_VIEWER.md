@@ -123,6 +123,27 @@ sello REAL del sidecar (vector `SIDECAR-VECTOR-1` en
 - `src/viewer/offline-viewer.test.ts` — tests (`node:test`, en la lista de
   `npm test`).
 
+## Smoke e2e contra la FAKE Smart Token (sin servicio real)
+
+`test/fake-smart-token/` es un doble en memoria del servicio HTTP Smart
+Token Prod v0.10.5, solo para pruebas: servidor (`fake-smart-token-server.mjs`)
++ CLI (`fake-smart-token-cli.ts`, espeja los 9 subcomandos reales +
+`serve`) + tests + smoke e2e del visor. Detalle completo, correspondencia
+fake-vs-real y límites en `test/fake-smart-token/README.md`.
+
+```sh
+npm run smoke:viewer-e2e   # también corre dentro de npm test
+```
+
+Levanta la fake en un puerto efímero, crea un paquete en modo
+`smart-token-custody` contra ella con el custodio HTTP real, corre este
+CLI con `SMART_TOKEN_API_URL` apuntando a la fake, y verifica con el
+runtime embebido que la contraseña correcta abre y la incorrecta es
+DENIED; con la fake caída (`--down` o `POST /__fake__/down`) el CLI
+falla cerrado. La fake guarda el blob envuelto (PBKDF2 + AES-256-GCM,
+del master solo su SHA-256) y **no** imita ML-KEM-768, Argon2id, la
+validation ladder ni el hang de fase 3: ver README.
+
 ## Smoke manual contra el sidecar real
 
 El sidecar necesita el paquete Python `cryptography` (el Python del
